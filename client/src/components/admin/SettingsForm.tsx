@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Settings } from "@/lib/types";
@@ -43,7 +44,7 @@ export default function SettingsForm() {
   });
 
   // Update form values when settings are loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (settings) {
       form.reset({
         redirectUrl: settings.redirectUrl,
