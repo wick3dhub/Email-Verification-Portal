@@ -35,7 +35,15 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
           try {
             const additionalDomains = JSON.parse(settings.additionalDomains);
             if (Array.isArray(additionalDomains) && additionalDomains.length > 0) {
-              domains.push(...additionalDomains);
+              // Parse domains from the array - handle both string and object formats
+              additionalDomains.forEach(domain => {
+                if (typeof domain === 'string') {
+                  domains.push(domain);
+                } else if (domain.domain && domain.verified) {
+                  // Only include verified domains
+                  domains.push(domain.domain);
+                }
+              });
             }
           } catch (err) {
             console.error("Error parsing additional domains:", err);
@@ -57,8 +65,16 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
         if (settings.additionalDomains) {
           try {
             const additionalDomains = JSON.parse(settings.additionalDomains);
-            if (Array.isArray(additionalDomains) && additionalDomains.includes(domainOption)) {
-              return domainOption;
+            if (Array.isArray(additionalDomains)) {
+              // Check for the domain in the additional domains array
+              for (const domain of additionalDomains) {
+                if (
+                  (typeof domain === 'string' && domain === domainOption) || 
+                  (domain.domain && domain.domain === domainOption && domain.verified)
+                ) {
+                  return domainOption;
+                }
+              }
             }
           } catch (err) {
             console.error("Error parsing additional domains:", err);
@@ -602,11 +618,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // Add the new domain
-        additionalDomains.push(domain);
+        // Generate a unique CNAME target for this domain
+        const cnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
+        
+        // Add the new domain with its CNAME target (store as object in JSON)
+        additionalDomains.push({
+          domain,
+          cnameTarget,
+          verified: false
+        });
       } else if (action === 'remove') {
         // Remove the domain
-        additionalDomains = additionalDomains.filter(d => d !== domain);
+        additionalDomains = additionalDomains.filter(d => {
+          // Handle both old string format and new object format
+          if (typeof d === 'string') {
+            return d !== domain;
+          } else {
+            return d.domain !== domain;
+          }
+        });
       } else {
         return res.status(400).json({
           success: false,
@@ -659,19 +689,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For the purposes of this demo, we're just simulating the verification
       // In production, you would use a DNS library to verify the CNAME record
       
-      // Update domain verification status
-      const updatedSettings = await storage.updateSettings({
-        customDomain: domain,
-        domainVerified: true,
-        // Generate a unique CNAME target based on the application
-        domainCnameTarget: `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`
-      });
+      // Check if this is the primary domain or an additional domain
+      let isPrimaryDomain = false;
+      let additionalDomains: any[] = [];
       
-      return res.status(200).json({
-        success: true,
-        message: "Domain verified successfully",
-        settings: updatedSettings
-      });
+      if (settings.customDomain === domain) {
+        isPrimaryDomain = true;
+      } else {
+        // Check in additional domains
+        try {
+          additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+          
+          // Handle both old string format and new object format
+          if (!Array.isArray(additionalDomains)) {
+            additionalDomains = [];
+          }
+        } catch (err) {
+          console.error("Error parsing additional domains:", err);
+          additionalDomains = [];
+        }
+      }
+      
+      if (isPrimaryDomain) {
+        // Verify primary domain
+        const updatedSettings = await storage.updateSettings({
+          customDomain: domain,
+          domainVerified: true
+        });
+        
+        return res.status(200).json({
+          success: true,
+          message: "Primary domain verified successfully",
+          isPrimary: true,
+          settings: updatedSettings
+        });
+      } else {
+        // Verify additional domain
+        const domainIndex = additionalDomains.findIndex(d => {
+          if (typeof d === 'string') {
+            return d === domain;
+          } else {
+            return d.domain === domain;
+          }
+        });
+        
+        if (domainIndex === -1) {
+          return res.status(404).json({
+            success: false,
+            message: "Domain not found in additional domains"
+          });
+        }
+        
+        // Update the domain verification status
+        if (typeof additionalDomains[domainIndex] === 'string') {
+          // Convert old format to new format
+          additionalDomains[domainIndex] = {
+            domain: additionalDomains[domainIndex],
+            cnameTarget: `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`,
+            verified: true
+          };
+        } else {
+          // Update existing object
+          additionalDomains[domainIndex].verified = true;
+        }
+        
+        // Save updated domains
+        const updatedSettings = await storage.updateSettings({
+          additionalDomains: JSON.stringify(additionalDomains)
+        });
+        
+        return res.status(200).json({
+          success: true,
+          message: "Additional domain verified successfully",
+          isPrimary: false,
+          settings: updatedSettings
+        });
+      }
     } catch (error) {
       console.error("Error verifying domain:", error);
       return res.status(500).json({ 
