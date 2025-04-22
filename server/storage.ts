@@ -77,6 +77,7 @@ export class MemStorage implements IStorage {
       securityLevel: 1,
       useWildcards: false,
       encryptionSalt: "default-salt-change-me",
+      allowLinkRenewal: true,
       // Custom message settings
       emailSubject: "Please verify your email address",
       emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",

@@ -303,8 +303,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create a new verification link with the same email
       const domain = await getVerificationDomain(req, 'default');
+      
+      // Generate secure code for the new link
+      const newCode = await storage.generateVerificationCode();
+      
       const newLink = await storage.createVerificationLink({
         email: email,
+        code: newCode,
         status: 'pending',
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
       });
