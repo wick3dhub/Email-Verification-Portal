@@ -807,24 +807,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If not skipping DNS check and we have a CNAME target, verify the CNAME record
       if (!skipDnsCheck && expectedCnameTarget) {
         try {
-          // In a real implementation, you would use a DNS library like dns-packet or dns to check the CNAME record
-          // For demonstration purposes, we're simulating this check with a simple flag to show the logic flow
+          // Import our DNS verification utility
+          const { verifyDomain } = require('./utils/dnsVerifier');
           
-          // This is a placeholder for a real DNS lookup
-          // In production, you would do something like:
-          // const dnsResult = await dns.promises.resolveCname(domain);
-          // const hasCnameMatch = dnsResult.some(cname => cname === expectedCnameTarget);
+          // Configure verification options
+          const verificationOptions = {
+            maxRetries: 3,       // Number of retries for DNS lookups
+            retryDelay: 2000,    // Initial delay between retries (will increase with exponential backoff)
+            timeoutMs: 5000      // Timeout for each DNS lookup attempt
+          };
           
-          // Since we can't do actual DNS lookups in this environment, we're simulating verification
-          // Allow a manual skip for testing, but in production you would actually verify the CNAME
-          const hasCnameMatch = true; // This would be determined by a real DNS lookup
+          // Perform full domain verification (checks both CNAME and TXT records)
+          const dnsResult = await verifyDomain(domain, expectedCnameTarget, verificationOptions);
           
-          if (!hasCnameMatch) {
+          if (!dnsResult.success) {
             return res.status(400).json({
               success: false,
-              message: `CNAME verification failed. Please set a CNAME record for ${domain} pointing to ${expectedCnameTarget}`
+              message: dnsResult.error || `CNAME verification failed. Please set a CNAME record for ${domain} pointing to ${expectedCnameTarget}`,
+              details: dnsResult.details,
+              records: dnsResult.records
             });
           }
+          
+          // Log success for monitoring purposes
+          console.log(`Domain ${domain} successfully verified with target ${expectedCnameTarget}`, 
+            dnsResult.details || 'via CNAME record');
         } catch (dnsError) {
           console.error("DNS verification error:", dnsError);
           return res.status(400).json({
