@@ -123,11 +123,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiresAt
         });
         
-        // Generate the URL for client
+        // Get domain for verification link 
+        const domain = await getVerificationDomain(req);
+        
+        // Generate the URL for client (with protocol and domain)
         generatedLinks.push({
           email: verificationLink.email,
           code: verificationLink.code,
-          url: `/verify/${verificationLink.code}`,
+          url: `https://${domain}/verify/${verificationLink.code}`,
           regenerated: existingLinks.length > 0
         });
       }
@@ -225,8 +228,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt
       });
       
-      // Get verification URL
-      const verificationUrl = `${req.protocol}://${req.get('host')}/verify/${verificationLink.code}`;
+      // Get domain for verification link
+      const domain = await getVerificationDomain(req);
+      
+      // Get verification URL with custom domain if enabled
+      const verificationUrl = `https://${domain}/verify/${verificationLink.code}`;
       
       if (useCustomTemplate) {
         try {
@@ -247,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(200).json({ 
               email: verificationLink.email,
               code: verificationLink.code,
-              url: `/verify/${verificationLink.code}`,
+              url: verificationUrl,
               message: "Verification link resent with custom template"
             });
           }
@@ -261,7 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json({ 
         email: verificationLink.email,
         code: verificationLink.code,
-        url: `/verify/${verificationLink.code}`,
+        url: verificationUrl,
         message: "Verification link resent"
       });
     } catch (error) {
@@ -346,6 +352,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Domain verification endpoint
+  app.post("/api/domain/verify", async (req: Request, res: Response) => {
+    try {
+      const { domain } = req.body;
+      
+      if (!domain) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Domain is required" 
+        });
+      }
+      
+      // Get existing settings
+      const settings = await storage.getSettings();
+      
+      if (!settings) {
+        return res.status(404).json({ 
+          success: false,
+          message: "Settings not found" 
+        });
+      }
+      
+      // In a real implementation, this would check DNS records for CNAME
+      // For the purposes of this demo, we're just simulating the verification
+      // In production, you would use a DNS library to verify the CNAME record
+      
+      // Update domain verification status
+      const updatedSettings = await storage.updateSettings({
+        customDomain: domain,
+        domainVerified: true,
+        // Generate a unique CNAME target based on the application
+        domainCnameTarget: `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: "Domain verified successfully",
+        settings: updatedSettings
+      });
+    } catch (error) {
+      console.error("Error verifying domain:", error);
+      return res.status(500).json({ 
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to verify domain" 
+      });
+    }
+  });
+
   app.post("/api/settings", async (req: Request, res: Response) => {
     try {
       const settingsSchema = z.object({
@@ -456,11 +510,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             expiresAt
           });
           
-          // Add to result
+          // Get domain for verification link
+          const domain = await getVerificationDomain(req);
+        
+          // Add to result with full URL
           generatedLinks.push({
             email: verificationLink.email,
             code: verificationLink.code,
-            url: `/verify/${verificationLink.code}`,
+            url: `https://${domain}/verify/${verificationLink.code}`,
             regenerated: existingLinks.length > 0
           });
         }
@@ -501,8 +558,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No links provided" });
       }
       
-      const baseUrl = process.env.BASE_URL || req.get('host') || 'localhost:5000';
-      const linkTexts = links.map(link => `${baseUrl}/verify/${link.code}`).join('\n');
+      // Get custom domain if enabled
+      const domain = await getVerificationDomain(req);
+      
+      // Generate links with the appropriate domain
+      const linkTexts = links.map(link => `https://${domain}/verify/${link.code}`).join('\n');
       
       res.status(200).json({ content: linkTexts });
     } catch (error) {

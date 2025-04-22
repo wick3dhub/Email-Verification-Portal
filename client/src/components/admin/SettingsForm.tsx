@@ -517,7 +517,8 @@ export default function SettingsForm() {
                     type="button"
                     variant="outline"
                     className="self-start"
-                    onClick={() => {
+                    disabled={updateMutation.isPending}
+                    onClick={async () => {
                       const domain = form.getValues('customDomain');
                       if (!domain) {
                         toast({
@@ -528,16 +529,48 @@ export default function SettingsForm() {
                         return;
                       }
                       
-                      // In a real implementation, this would check DNS records
-                      // For now, we'll just simulate a verification process
-                      form.setValue('domainVerified', true);
-                      toast({
-                        title: "Domain verified",
-                        description: "Your domain has been successfully verified",
-                      });
+                      try {
+                        const res = await apiRequest("POST", "/api/domain/verify", { domain });
+                        const data = await res.json();
+                        
+                        if (data.success) {
+                          // Update form values with the response
+                          if (data.settings) {
+                            form.setValue('domainVerified', data.settings.domainVerified);
+                            form.setValue('domainCnameTarget', data.settings.domainCnameTarget);
+                          }
+                          
+                          toast({
+                            title: "Domain verified",
+                            description: "Your domain has been successfully verified. Use the provided CNAME record to point your domain.",
+                          });
+                          
+                          // Refresh settings data
+                          queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+                        } else {
+                          toast({
+                            title: "Verification failed",
+                            description: data.message || "Unable to verify domain",
+                            variant: "destructive",
+                          });
+                        }
+                      } catch (error) {
+                        toast({
+                          title: "Verification error",
+                          description: error instanceof Error ? error.message : "Failed to verify domain",
+                          variant: "destructive",
+                        });
+                      }
                     }}
                   >
-                    Verify Domain
+                    {updateMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify Domain"
+                    )}
                   </Button>
                 </div>
               </>
