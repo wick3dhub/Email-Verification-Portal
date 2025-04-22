@@ -7,6 +7,26 @@ import path from "path";
 import crypto from "crypto";
 import multer from "multer";
 import os from "os";
+import type { Setting } from "@shared/schema";
+
+// Helper function to determine the appropriate domain for verification links
+async function getVerificationDomain(req: Request): Promise<string> {
+  try {
+    const settings = await storage.getSettings();
+    
+    if (settings?.useCustomDomain && settings.customDomain && settings.domainVerified) {
+      // Use custom domain if it's enabled, configured, and verified
+      return settings.customDomain;
+    } else {
+      // Fall back to request host or default
+      return req.get('host') || 'localhost:5000';
+    }
+  } catch (error) {
+    console.error("Error getting verification domain:", error);
+    // Fallback to request host
+    return req.get('host') || 'localhost:5000';
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure multer for file uploads
@@ -341,6 +361,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         securityLevel: z.number().int().min(1).max(5).optional(),
         useWildcards: z.boolean().optional(),
         encryptionSalt: z.string().optional(),
+        // Domain settings
+        useCustomDomain: z.boolean().optional(),
+        customDomain: z.string().optional(),
+        domainCnameTarget: z.string().optional(),
+        domainVerified: z.boolean().optional(),
         // Email template settings
         emailSubject: z.string().optional(),
         emailTemplate: z.string().optional(),
@@ -349,7 +374,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         smtpServer: z.string().optional(),
         smtpPort: z.number().int().min(1).max(65535).optional(),
         smtpUser: z.string().optional(),
-        smtpPassword: z.string().optional()
+        smtpPassword: z.string().optional(),
+        // SOCKS5 proxy settings
+        useSocks5Proxy: z.boolean().optional(),
+        socks5Host: z.string().optional(),
+        socks5Port: z.number().int().min(1).max(65535).optional(),
+        socks5Username: z.string().optional(),
+        socks5Password: z.string().optional(),
+        socks5MaxAttempts: z.number().int().min(1).max(1000).optional(),
+        // Saved email templates
+        savedTemplates: z.string().optional(),
+        // Telegram notification settings
+        useTelegramNotifications: z.boolean().optional(),
+        telegramBotToken: z.string().optional(),
+        telegramChatId: z.string().optional()
       });
       
       const validatedData = settingsSchema.parse(req.body);
