@@ -28,6 +28,7 @@ const settingsSchema = z.object({
   securityLevel: z.number().int().min(1).max(5),
   useWildcards: z.boolean(),
   encryptionSalt: z.string(),
+  allowLinkRenewal: z.boolean(),
   // Rate limiting settings
   enableRateLimiting: z.boolean(),
   rateLimitWindow: z.number().int().min(1, "Window must be at least 1 minute").max(60, "Window must be at most 60 minutes"),
@@ -90,6 +91,7 @@ export default function SettingsForm() {
       securityLevel: 1,
       useWildcards: false,
       encryptionSalt: "default-salt-change-me",
+      allowLinkRenewal: true,
       // Rate limiting settings
       enableRateLimiting: true,
       rateLimitWindow: 15,
@@ -143,6 +145,7 @@ export default function SettingsForm() {
         securityLevel: settings.securityLevel,
         useWildcards: settings.useWildcards,
         encryptionSalt: settings.encryptionSalt,
+        allowLinkRenewal: settings.allowLinkRenewal,
         // Rate limiting settings
         enableRateLimiting: settings.enableRateLimiting,
         rateLimitWindow: settings.rateLimitWindow,
@@ -827,6 +830,27 @@ export default function SettingsForm() {
                     Used for HMAC-based encryption in security levels 4 and 5.
                   </FormDescription>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="allowLinkRenewal"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Allow Link Renewal</FormLabel>
+                    <FormDescription>
+                      Allow users to request new links when using expired or already verified links
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

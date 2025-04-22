@@ -23,6 +23,7 @@ export interface Settings {
   securityLevel: number;
   useWildcards: boolean;
   encryptionSalt: string;
+  allowLinkRenewal: boolean;
   // Domain settings
   useCustomDomain: boolean;
   customDomain: string;

@@ -191,6 +191,7 @@ export class MemStorage implements IStorage {
         securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
         useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
         encryptionSalt: data.encryptionSalt || "default-salt-change-me",
+        allowLinkRenewal: data.allowLinkRenewal !== undefined ? data.allowLinkRenewal : true,
         // Domain settings
         useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : false,
         customDomain: data.customDomain || "",
@@ -241,6 +242,7 @@ export class MemStorage implements IStorage {
         securityLevel: data.securityLevel !== undefined ? data.securityLevel : this.settingsData.securityLevel,
         useWildcards: data.useWildcards !== undefined ? data.useWildcards : this.settingsData.useWildcards,
         encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : this.settingsData.encryptionSalt,
+        allowLinkRenewal: data.allowLinkRenewal !== undefined ? data.allowLinkRenewal : this.settingsData.allowLinkRenewal,
         // Domain settings
         useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : this.settingsData.useCustomDomain,
         customDomain: data.customDomain !== undefined ? data.customDomain : this.settingsData.customDomain,
@@ -384,6 +386,7 @@ export class DatabaseStorage implements IStorage {
         securityLevel: 1,
         useWildcards: false,
         encryptionSalt: "default-salt-change-me",
+        allowLinkRenewal: true,
         // Domain settings
         useCustomDomain: false,
         customDomain: "",
@@ -444,6 +447,7 @@ export class DatabaseStorage implements IStorage {
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
           encryptionSalt: data.encryptionSalt || "default-salt-change-me",
+          allowLinkRenewal: data.allowLinkRenewal !== undefined ? data.allowLinkRenewal : true,
           // Domain settings
           useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : false,
           customDomain: data.customDomain || "",
@@ -493,6 +497,7 @@ export class DatabaseStorage implements IStorage {
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : currentSetting.securityLevel,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : currentSetting.useWildcards,
           encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt,
+          allowLinkRenewal: data.allowLinkRenewal !== undefined ? data.allowLinkRenewal : currentSetting.allowLinkRenewal,
           // Domain settings
           useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : currentSetting.useCustomDomain,
           customDomain: data.customDomain !== undefined ? data.customDomain : currentSetting.customDomain,

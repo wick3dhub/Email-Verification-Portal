@@ -43,6 +43,7 @@ export const settings = pgTable("settings", {
   securityLevel: integer("security_level").notNull().default(1),
   useWildcards: boolean("use_wildcards").notNull().default(false),
   encryptionSalt: text("encryption_salt").notNull().default(""),
+  allowLinkRenewal: boolean("allow_link_renewal").notNull().default(true),
   // Domain settings
   useCustomDomain: boolean("use_custom_domain").notNull().default(false),
   customDomain: text("custom_domain").notNull().default(""),

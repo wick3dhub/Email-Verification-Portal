@@ -11,6 +11,7 @@ interface VerificationProcessProps {
   settings: Settings | null;
   email?: string;
   onBotCheckComplete?: () => void;
+  onRenewRequest?: () => Promise<boolean>;
 }
 
 export default function VerificationProcess({ 
@@ -18,10 +19,12 @@ export default function VerificationProcess({
   errorMessage = "Verification link is invalid or has expired.", 
   settings,
   email,
-  onBotCheckComplete
+  onBotCheckComplete,
+  onRenewRequest
 }: VerificationProcessProps) {
   const [answer, setAnswer] = useState<string>("");
   const [botCheckError, setBotCheckError] = useState<string>("");
+  const [renewalState, setRenewalState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   
   // Simple math question for bot protection
   const num1 = 5;
