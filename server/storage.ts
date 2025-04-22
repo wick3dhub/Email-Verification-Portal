@@ -429,6 +429,7 @@ export class DatabaseStorage implements IStorage {
           customDomain: data.customDomain || "",
           domainCnameTarget: data.domainCnameTarget || "",
           domainVerified: data.domainVerified !== undefined ? data.domainVerified : false,
+          additionalDomains: data.additionalDomains || "[]",
           // Custom message settings
           emailSubject: data.emailSubject || "Please verify your email address",
           emailTemplate: data.emailTemplate || "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -477,6 +478,7 @@ export class DatabaseStorage implements IStorage {
           customDomain: data.customDomain !== undefined ? data.customDomain : currentSetting.customDomain,
           domainCnameTarget: data.domainCnameTarget !== undefined ? data.domainCnameTarget : currentSetting.domainCnameTarget,
           domainVerified: data.domainVerified !== undefined ? data.domainVerified : currentSetting.domainVerified,
+          additionalDomains: data.additionalDomains !== undefined ? data.additionalDomains : currentSetting.additionalDomains,
           // Email settings
           emailSubject: data.emailSubject !== undefined ? data.emailSubject : currentSetting.emailSubject,
           emailTemplate: data.emailTemplate !== undefined ? data.emailTemplate : currentSetting.emailTemplate,

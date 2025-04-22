@@ -173,7 +173,8 @@ export class SecureStorage implements IStorage {
         useCustomThankYouPage: false,
         securityLevel: 1,
         useWildcards: false,
-        encryptionSalt: "default-salt-change-me"
+        encryptionSalt: "default-salt-change-me",
+        additionalDomains: "[]"
       });
     }
     
@@ -200,7 +201,8 @@ export class SecureStorage implements IStorage {
           useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false,
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
-          encryptionSalt: data.encryptionSalt || "default-salt-change-me"
+          encryptionSalt: data.encryptionSalt || "default-salt-change-me",
+          additionalDomains: data.additionalDomains || "[]"
         })
         .returning();
       return setting;
@@ -221,7 +223,8 @@ export class SecureStorage implements IStorage {
           useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : currentSetting.useCustomThankYouPage,
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : currentSetting.securityLevel,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : currentSetting.useWildcards,
-          encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt
+          encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt,
+          additionalDomains: data.additionalDomains !== undefined ? data.additionalDomains : currentSetting.additionalDomains
         })
         .where(eq(settings.id, currentSetting.id))
         .returning();
