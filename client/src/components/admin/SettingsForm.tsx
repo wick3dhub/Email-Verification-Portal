@@ -603,17 +603,97 @@ export default function SettingsForm() {
               name="emailTemplate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email Template</FormLabel>
+                  <FormLabel>Email Template (HTML)</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal"
-                      className="min-h-[200px] font-mono"
+                      placeholder={`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      background: linear-gradient(45deg, #ff6b6b, #6b47ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+    }
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      background: linear-gradient(45deg, #ff6b6b, #6b47ff);
+      color: white !important;
+      text-decoration: none;
+      border-radius: 5px;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+    .footer {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #777;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">Wick3d Link Portal</div>
+    </div>
+    <p>Hello,</p>
+    <p>Thank you for using our service. Please click the button below to verify your email address:</p>
+    <div style="text-align: center;">
+      <a href="{link}" class="button">Verify Email Address</a>
+    </div>
+    <p>If the button doesn't work, you can also click on the link below:</p>
+    <p><a href="{link}">{link}</a></p>
+    <p>This link will expire in 7 days.</p>
+    <p>Thank you,<br>The Wick3d Link Portal Team</p>
+    <div class="footer">
+      <p>© 2025 Wick3d Link Portal. All rights reserved.</p>
+      <p>If you didn't request this email, please ignore it.</p>
+    </div>
+  </div>
+</body>
+</html>`}
+                      className="min-h-[400px] font-mono text-sm"
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    Use {'{link}'} as a placeholder for the verification link. This will be replaced with the actual link when the email is sent.
+                    Use HTML to create a professional, branded email template.
                   </FormDescription>
+                  <div className="mt-2 space-y-2 text-sm text-gray-500">
+                    <div>Available placeholders:</div>
+                    <div className="pl-5">
+                      <div className="mb-1">• <code className="bg-gray-100 px-1 rounded">{'{link}'}</code> - The verification link</div>
+                      <div className="mb-1">• <code className="bg-gray-100 px-1 rounded">{'{email}'}</code> - Recipient's email address</div>
+                      <div className="mb-1">• <code className="bg-gray-100 px-1 rounded">{'{date}'}</code> - Current date</div>
+                    </div>
+                    <div className="text-amber-600">Note: Some email clients may not support all HTML/CSS features. Always test your template.</div>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
