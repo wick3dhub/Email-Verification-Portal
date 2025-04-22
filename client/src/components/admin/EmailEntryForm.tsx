@@ -32,8 +32,46 @@ export default function EmailEntryForm() {
   const [uploadFileName, setUploadFileName] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<string>("manual");
+  const [selectedDomain, setSelectedDomain] = useState<string>("default");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  // Fetch settings to get available domains
+  const { data: settings } = useQuery<Settings>({
+    queryKey: ["/api/settings"],
+  });
+  
+  // Process available domains for selection
+  const domainOptions = useMemo(() => {
+    const options = [
+      { value: "default", label: "Default Domain" },
+      { value: "random", label: "Random Domain" }
+    ];
+    
+    // Add main custom domain if enabled
+    if (settings?.useCustomDomain && settings.customDomain && settings.domainVerified) {
+      options.push({ 
+        value: settings.customDomain, 
+        label: settings.customDomain 
+      });
+    }
+    
+    // Add additional domains if any
+    if (settings?.useCustomDomain && settings.additionalDomains) {
+      try {
+        const additionalDomains = JSON.parse(settings.additionalDomains);
+        if (Array.isArray(additionalDomains) && additionalDomains.length > 0) {
+          additionalDomains.forEach((domain: string) => {
+            options.push({ value: domain, label: domain });
+          });
+        }
+      } catch (error) {
+        console.error("Error parsing additional domains:", error);
+      }
+    }
+    
+    return options;
+  }, [settings]);
   
   const form = useForm<EmailBatchFormValues>({
     resolver: zodResolver(emailBatchSchema),
@@ -48,6 +86,7 @@ export default function EmailEntryForm() {
       const res = await apiRequest("POST", "/api/verification/generate", {
         emails: values.emails,
         expireDays: values.expireDays,
+        domain: selectedDomain, // Add selected domain to the request
       });
       return res.json();
     },
@@ -110,6 +149,7 @@ export default function EmailEntryForm() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('expireDays', expireDays.toString());
+      formData.append('domain', selectedDomain);
       
       // Create a custom fetch with progress tracking
       const xhr = new XMLHttpRequest();
@@ -281,6 +321,30 @@ export default function EmailEntryForm() {
                     )}
                   />
                   
+                  {/* Domain Selection */}
+                  <div className="space-y-2">
+                    <FormLabel>Domain for Verification Links</FormLabel>
+                    <Select
+                      value={selectedDomain}
+                      onValueChange={setSelectedDomain}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select domain" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {domainOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Choose which domain to use for verification links. 
+                      "Default" uses the application domain, "Random" picks a domain randomly from available domains.
+                    </FormDescription>
+                  </div>
+                  
                   <div className="flex justify-end">
                     <Button
                       type="submit"
@@ -327,6 +391,30 @@ export default function EmailEntryForm() {
                       </FormItem>
                     )}
                   />
+                  
+                  {/* Domain Selection for File Upload */}
+                  <div className="space-y-2">
+                    <FormLabel>Domain for Verification Links</FormLabel>
+                    <Select
+                      value={selectedDomain}
+                      onValueChange={setSelectedDomain}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select domain" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {domainOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Choose which domain to use for verification links. 
+                      "Default" uses the application domain, "Random" picks a domain randomly from available domains.
+                    </FormDescription>
+                  </div>
                   
                   <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition cursor-pointer" onClick={handleChooseFile}>
                     <FileUp className="h-10 w-10 mb-3 text-gray-400" />

@@ -10,16 +10,63 @@ import os from "os";
 import type { Setting } from "@shared/schema";
 
 // Helper function to determine the appropriate domain for verification links
-async function getVerificationDomain(req: Request): Promise<string> {
+async function getVerificationDomain(req: Request, domainOption: string = 'default'): Promise<string> {
   try {
     const settings = await storage.getSettings();
+    const defaultDomain = req.get('host') || 'localhost:5000';
     
-    if (settings?.useCustomDomain && settings.customDomain && settings.domainVerified) {
-      // Use custom domain if it's enabled, configured, and verified
-      return settings.customDomain;
-    } else {
-      // Fall back to request host or default
-      return req.get('host') || 'localhost:5000';
+    // If custom domains are not enabled or the main domain is not verified, use default
+    if (!settings?.useCustomDomain || !settings.customDomain || !settings.domainVerified) {
+      return defaultDomain;
+    }
+    
+    // Handle different domain selection options
+    switch(domainOption) {
+      case 'default':
+        // Use default domain (request host)
+        return defaultDomain;
+        
+      case 'random': {
+        // Create array of available domains (main + additional)
+        const domains = [settings.customDomain];
+        
+        // Add additional domains if available
+        if (settings.additionalDomains) {
+          try {
+            const additionalDomains = JSON.parse(settings.additionalDomains);
+            if (Array.isArray(additionalDomains) && additionalDomains.length > 0) {
+              domains.push(...additionalDomains);
+            }
+          } catch (err) {
+            console.error("Error parsing additional domains:", err);
+          }
+        }
+        
+        // Select random domain from available domains
+        const randomIndex = Math.floor(Math.random() * domains.length);
+        return domains[randomIndex];
+      }
+        
+      default:
+        // If a specific domain is provided, verify it's either the main domain or in additional domains
+        if (domainOption === settings.customDomain) {
+          return domainOption;
+        }
+        
+        // Check if the domain is in additional domains
+        if (settings.additionalDomains) {
+          try {
+            const additionalDomains = JSON.parse(settings.additionalDomains);
+            if (Array.isArray(additionalDomains) && additionalDomains.includes(domainOption)) {
+              return domainOption;
+            }
+          } catch (err) {
+            console.error("Error parsing additional domains:", err);
+          }
+        }
+        
+        // If domain wasn't found, fall back to main custom domain
+        return settings.customDomain;
     }
   } catch (error) {
     console.error("Error getting verification domain:", error);
@@ -81,7 +128,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const emailBatchSchema = z.object({
         emails: z.string().nonempty(),
-        expireDays: z.number().int().min(1).default(7)
+        expireDays: z.number().int().min(1).default(7),
+        domain: z.string().optional().default('default')
       });
       
       const validatedData = emailBatchSchema.parse(req.body);
