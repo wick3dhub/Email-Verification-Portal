@@ -171,8 +171,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiresAt
         });
         
-        // Get domain for verification link 
-        const domain = await getVerificationDomain(req);
+        // Get domain for verification link using the selected domain option
+        const domain = await getVerificationDomain(req, validatedData.domain);
         
         // Generate the URL for client (with protocol and domain)
         generatedLinks.push({
@@ -256,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Resend verification for an email
   app.post("/api/verification/resend", async (req: Request, res: Response) => {
     try {
-      const { email, useCustomTemplate = false } = req.body;
+      const { email, useCustomTemplate = false, domain: domainOption = 'default' } = req.body;
       
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
@@ -276,8 +276,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt
       });
       
-      // Get domain for verification link
-      const domain = await getVerificationDomain(req);
+      // Get domain for verification link using specified domain option
+      const domain = await getVerificationDomain(req, domainOption);
       
       // Get verification URL with custom domain if enabled
       const verificationUrl = `https://${domain}/verify/${verificationLink.code}`;
@@ -515,6 +515,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid expiration days" });
       }
       
+      // Get domain option (default, random, or specific domain)
+      const domainOption = req.body.domain || 'default';
+      
       // Read the file
       const fileContent = fs.readFileSync(req.file.path, 'utf8');
       
@@ -558,8 +561,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             expiresAt
           });
           
-          // Get domain for verification link
-          const domain = await getVerificationDomain(req);
+          // Get domain for verification link using the selected domain option
+          const domain = await getVerificationDomain(req, domainOption);
         
           // Add to result with full URL
           generatedLinks.push({
@@ -600,14 +603,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Download verification links as text file
   app.post("/api/verification/download", async (req: Request, res: Response) => {
     try {
-      const { links } = req.body;
+      const { links, domain: domainOption = 'default' } = req.body;
       
       if (!links || !Array.isArray(links) || links.length === 0) {
         return res.status(400).json({ message: "No links provided" });
       }
       
       // Get custom domain if enabled
-      const domain = await getVerificationDomain(req);
+      const domain = await getVerificationDomain(req, domainOption);
       
       // Generate links with the appropriate domain
       const linkTexts = links.map(link => `https://${domain}/verify/${link.code}`).join('\n');
