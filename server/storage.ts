@@ -9,6 +9,8 @@ import {
   type Setting,
   type InsertSetting
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, and, desc } from "drizzle-orm";
 import crypto from 'crypto';
 
 export interface IStorage {
@@ -160,4 +162,143 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+  
+  // Verification link operations
+  async createVerificationLink(data: InsertVerificationLink): Promise<VerificationLink> {
+    const [link] = await db
+      .insert(verificationLinks)
+      .values({
+        ...data,
+        status: 'pending',
+        createdAt: new Date(),
+        verifiedAt: null
+      })
+      .returning();
+    return link;
+  }
+  
+  async getVerificationLinkByCode(code: string): Promise<VerificationLink | undefined> {
+    const [link] = await db
+      .select()
+      .from(verificationLinks)
+      .where(eq(verificationLinks.code, code));
+    return link || undefined;
+  }
+  
+  async getVerificationLinksByEmail(email: string): Promise<VerificationLink[]> {
+    return db
+      .select()
+      .from(verificationLinks)
+      .where(eq(verificationLinks.email, email));
+  }
+  
+  async getAllVerificationLinks(): Promise<VerificationLink[]> {
+    return db
+      .select()
+      .from(verificationLinks)
+      .orderBy(desc(verificationLinks.createdAt));
+  }
+  
+  async updateVerificationLinkStatus(id: number, status: string, verifiedAt?: Date): Promise<VerificationLink | undefined> {
+    const [link] = await db
+      .update(verificationLinks)
+      .set({ 
+        status, 
+        verifiedAt: verifiedAt || undefined 
+      })
+      .where(eq(verificationLinks.id, id))
+      .returning();
+    return link || undefined;
+  }
+  
+  // Settings operations
+  async getSettings(): Promise<Setting | undefined> {
+    const [setting] = await db.select().from(settings);
+    
+    // If no settings exist, create default settings
+    if (!setting) {
+      return this.updateSettings({
+        redirectUrl: "https://example.com/thank-you",
+        showLoadingSpinner: true,
+        loadingDuration: 3,
+        successMessage: "Thank you for verifying your email address!"
+      });
+    }
+    
+    return setting;
+  }
+  
+  async updateSettings(data: Partial<InsertSetting>): Promise<Setting> {
+    // Check if settings exist
+    const existingSettings = await db.select().from(settings);
+    
+    if (existingSettings.length === 0) {
+      // Create new settings
+      const [setting] = await db
+        .insert(settings)
+        .values({
+          redirectUrl: data.redirectUrl || "https://example.com/thank-you",
+          showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : true,
+          loadingDuration: data.loadingDuration || 3,
+          successMessage: data.successMessage || "Thank you for verifying your email address!"
+        })
+        .returning();
+      return setting;
+    } else {
+      // Update existing settings
+      const [currentSetting] = existingSettings;
+      const [updatedSetting] = await db
+        .update(settings)
+        .set({
+          redirectUrl: data.redirectUrl !== undefined ? data.redirectUrl : currentSetting.redirectUrl,
+          showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : currentSetting.showLoadingSpinner,
+          loadingDuration: data.loadingDuration !== undefined ? data.loadingDuration : currentSetting.loadingDuration,
+          successMessage: data.successMessage !== undefined ? data.successMessage : currentSetting.successMessage
+        })
+        .where(eq(settings.id, currentSetting.id))
+        .returning();
+      return updatedSetting;
+    }
+  }
+  
+  // Helper method to generate verification codes
+  generateVerificationCode(): string {
+    return crypto.randomBytes(16).toString('hex');
+  }
+}
+
+// Initialize storage with database implementation
+export const storage = new DatabaseStorage();
+
+// Create default admin user if it doesn't exist
+(async () => {
+  // Check if admin user exists
+  const admin = await storage.getUserByUsername("admin@example.com");
+  if (!admin) {
+    // Create admin user
+    await storage.createUser({
+      username: "admin@example.com",
+      password: "password123"
+    });
+    console.log("Default admin user created");
+  }
+})().catch(err => console.error("Error initializing database:", err));
