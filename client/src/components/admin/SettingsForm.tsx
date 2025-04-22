@@ -28,6 +28,11 @@ const settingsSchema = z.object({
   securityLevel: z.number().int().min(1).max(5),
   useWildcards: z.boolean(),
   encryptionSalt: z.string(),
+  // Rate limiting settings
+  enableRateLimiting: z.boolean(),
+  rateLimitWindow: z.number().int().min(1, "Window must be at least 1 minute").max(60, "Window must be at most 60 minutes"),
+  rateLimitMaxRequests: z.number().int().min(10, "Max requests must be at least 10").max(1000, "Max requests must be at most 1000"),
+  rateLimitBlockDuration: z.number().int().min(5, "Block duration must be at least 5 minutes").max(1440, "Block duration must be at most 1440 minutes (24 hours)"),
   // Domain settings
   useCustomDomain: z.boolean(),
   customDomain: z.string().optional(),
@@ -85,6 +90,11 @@ export default function SettingsForm() {
       securityLevel: 1,
       useWildcards: false,
       encryptionSalt: "default-salt-change-me",
+      // Rate limiting settings
+      enableRateLimiting: true,
+      rateLimitWindow: 15,
+      rateLimitMaxRequests: 100,
+      rateLimitBlockDuration: 30,
       // Domain settings
       useCustomDomain: false,
       customDomain: "",
@@ -133,6 +143,11 @@ export default function SettingsForm() {
         securityLevel: settings.securityLevel,
         useWildcards: settings.useWildcards,
         encryptionSalt: settings.encryptionSalt,
+        // Rate limiting settings
+        enableRateLimiting: settings.enableRateLimiting,
+        rateLimitWindow: settings.rateLimitWindow,
+        rateLimitMaxRequests: settings.rateLimitMaxRequests,
+        rateLimitBlockDuration: settings.rateLimitBlockDuration,
         // Domain settings
         useCustomDomain: settings.useCustomDomain,
         customDomain: settings.customDomain || '',
@@ -815,6 +830,107 @@ export default function SettingsForm() {
                 </FormItem>
               )}
             />
+
+            <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">Rate Limiting Settings</h3>
+              <p className="mt-1 text-sm text-gray-500 mb-4">
+                Configure rate limiting to protect against abuse and bot traffic.
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="enableRateLimiting"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Enable Rate Limiting</FormLabel>
+                    <FormDescription>
+                      Limit the number of requests from a single IP address to prevent abuse
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {form.watch('enableRateLimiting') && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="rateLimitWindow"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rate Limit Window (minutes)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={60}
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Time window for rate limiting (1-60 minutes)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="rateLimitMaxRequests"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Maximum Requests per Window</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={10}
+                          max={1000}
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 100)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Maximum number of requests allowed in the time window (10-1000)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="rateLimitBlockDuration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Block Duration (minutes)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={5}
+                          max={1440}
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 30)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        How long to block IPs after they exceed the limit (5-1440 minutes)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
 
             <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
               <h3 className="text-base font-medium text-gray-900 mb-4">Saved Email Templates</h3>

@@ -207,7 +207,12 @@ export class SecureStorage implements IStorage {
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
           encryptionSalt: data.encryptionSalt || "default-salt-change-me",
-          additionalDomains: data.additionalDomains || "[]"
+          additionalDomains: data.additionalDomains || "[]",
+          // Rate limiting settings
+          enableRateLimiting: data.enableRateLimiting !== undefined ? data.enableRateLimiting : true,
+          rateLimitWindow: data.rateLimitWindow || 15,
+          rateLimitMaxRequests: data.rateLimitMaxRequests || 100,
+          rateLimitBlockDuration: data.rateLimitBlockDuration || 30
         })
         .returning();
       return setting;
@@ -229,7 +234,12 @@ export class SecureStorage implements IStorage {
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : currentSetting.securityLevel,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : currentSetting.useWildcards,
           encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt,
-          additionalDomains: data.additionalDomains !== undefined ? data.additionalDomains : currentSetting.additionalDomains
+          additionalDomains: data.additionalDomains !== undefined ? data.additionalDomains : currentSetting.additionalDomains,
+          // Rate limiting settings
+          enableRateLimiting: data.enableRateLimiting !== undefined ? data.enableRateLimiting : currentSetting.enableRateLimiting,
+          rateLimitWindow: data.rateLimitWindow !== undefined ? data.rateLimitWindow : currentSetting.rateLimitWindow,
+          rateLimitMaxRequests: data.rateLimitMaxRequests !== undefined ? data.rateLimitMaxRequests : currentSetting.rateLimitMaxRequests,
+          rateLimitBlockDuration: data.rateLimitBlockDuration !== undefined ? data.rateLimitBlockDuration : currentSetting.rateLimitBlockDuration
         })
         .where(eq(settings.id, currentSetting.id))
         .returning();
