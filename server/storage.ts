@@ -98,7 +98,12 @@ export class MemStorage implements IStorage {
       // Telegram notification settings
       useTelegramNotifications: false,
       telegramBotToken: "",
-      telegramChatId: ""
+      telegramChatId: "",
+      // Rate limiting settings
+      enableRateLimiting: true,
+      rateLimitWindow: 15,
+      rateLimitMaxRequests: 100,
+      rateLimitBlockDuration: 30
     };
   }
 
@@ -213,7 +218,12 @@ export class MemStorage implements IStorage {
         // Telegram notification settings
         useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : false,
         telegramBotToken: data.telegramBotToken || "",
-        telegramChatId: data.telegramChatId || ""
+        telegramChatId: data.telegramChatId || "",
+        // Rate limiting settings
+        enableRateLimiting: data.enableRateLimiting !== undefined ? data.enableRateLimiting : true,
+        rateLimitWindow: data.rateLimitWindow || 15,
+        rateLimitMaxRequests: data.rateLimitMaxRequests || 100,
+        rateLimitBlockDuration: data.rateLimitBlockDuration || 30
       };
     } else {
       // Update existing settings
@@ -258,7 +268,12 @@ export class MemStorage implements IStorage {
         // Telegram notification settings
         useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : this.settingsData.useTelegramNotifications,
         telegramBotToken: data.telegramBotToken !== undefined ? data.telegramBotToken : this.settingsData.telegramBotToken,
-        telegramChatId: data.telegramChatId !== undefined ? data.telegramChatId : this.settingsData.telegramChatId
+        telegramChatId: data.telegramChatId !== undefined ? data.telegramChatId : this.settingsData.telegramChatId,
+        // Rate limiting settings
+        enableRateLimiting: data.enableRateLimiting !== undefined ? data.enableRateLimiting : this.settingsData.enableRateLimiting,
+        rateLimitWindow: data.rateLimitWindow !== undefined ? data.rateLimitWindow : this.settingsData.rateLimitWindow,
+        rateLimitMaxRequests: data.rateLimitMaxRequests !== undefined ? data.rateLimitMaxRequests : this.settingsData.rateLimitMaxRequests,
+        rateLimitBlockDuration: data.rateLimitBlockDuration !== undefined ? data.rateLimitBlockDuration : this.settingsData.rateLimitBlockDuration
       };
     }
     
@@ -396,7 +411,12 @@ export class DatabaseStorage implements IStorage {
         // Telegram notification settings
         useTelegramNotifications: false,
         telegramBotToken: "",
-        telegramChatId: ""
+        telegramChatId: "",
+        // Rate limiting settings
+        enableRateLimiting: true,
+        rateLimitWindow: 15,
+        rateLimitMaxRequests: 100,
+        rateLimitBlockDuration: 30
       });
     }
     

@@ -71,6 +71,11 @@ export const settings = pgTable("settings", {
   useTelegramNotifications: boolean("use_telegram_notifications").notNull().default(false),
   telegramBotToken: text("telegram_bot_token").notNull().default(""),
   telegramChatId: text("telegram_chat_id").notNull().default(""),
+  // Rate limiting settings
+  enableRateLimiting: boolean("enable_rate_limiting").notNull().default(true),
+  rateLimitWindow: integer("rate_limit_window").notNull().default(15), // time window in minutes
+  rateLimitMaxRequests: integer("rate_limit_max_requests").notNull().default(100), // max requests per window
+  rateLimitBlockDuration: integer("rate_limit_block_duration").notNull().default(30), // block duration in minutes
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).pick({
@@ -114,6 +119,11 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   useTelegramNotifications: true,
   telegramBotToken: true,
   telegramChatId: true,
+  // Rate limiting settings
+  enableRateLimiting: true,
+  rateLimitWindow: true,
+  rateLimitMaxRequests: true,
+  rateLimitBlockDuration: true,
 });
 
 export type User = typeof users.$inferSelect;
