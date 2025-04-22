@@ -238,7 +238,7 @@ export default function VerificationStatusTable() {
                 value={statusFilter}
                 onValueChange={setStatusFilter}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
