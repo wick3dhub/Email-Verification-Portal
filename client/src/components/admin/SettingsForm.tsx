@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Settings } from "@/lib/types";
@@ -472,6 +472,109 @@ export default function SettingsForm() {
                   <FormMessage />
                 </FormItem>
               )}
+            />
+
+            <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">Saved Email Templates</h3>
+              <p className="mt-1 text-sm text-gray-500 mb-4">
+                Save and reuse your email templates for different campaigns.
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="savedTemplates"
+              render={({ field }) => {
+                // Parse saved templates from JSON string
+                const templates = useMemo(() => {
+                  try {
+                    return JSON.parse(field.value || '[]');
+                  } catch (error) {
+                    console.error("Error parsing saved templates:", error);
+                    return [];
+                  }
+                }, [field.value]);
+
+                // Function to save current template
+                const saveCurrentTemplate = () => {
+                  const name = window.prompt("Enter a name for this template:");
+                  if (!name) return;
+                  
+                  const newTemplate = {
+                    id: Date.now().toString(),
+                    name,
+                    subject: form.getValues("emailSubject"),
+                    content: form.getValues("emailTemplate")
+                  };
+                  
+                  const updatedTemplates = [...templates, newTemplate];
+                  field.onChange(JSON.stringify(updatedTemplates));
+                };
+
+                // Function to load a template
+                const loadTemplate = (template: { subject: string; content: string }) => {
+                  form.setValue("emailSubject", template.subject);
+                  form.setValue("emailTemplate", template.content);
+                };
+
+                // Function to delete a template
+                const deleteTemplate = (id: string) => {
+                  const updatedTemplates = templates.filter((t: { id: string }) => t.id !== id);
+                  field.onChange(JSON.stringify(updatedTemplates));
+                };
+
+                return (
+                  <FormItem>
+                    <div className="flex justify-between items-center mb-4">
+                      <FormLabel className="text-base">Template Library</FormLabel>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={saveCurrentTemplate}
+                      >
+                        Save Current Template
+                      </Button>
+                    </div>
+                    
+                    {templates.length === 0 ? (
+                      <div className="text-center p-6 border border-dashed rounded-md">
+                        <p className="text-sm text-gray-500">No saved templates yet. Save your current template to add it to your library.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3">
+                        {templates.map((template: { id: string; name: string; subject: string; content: string }) => (
+                          <div key={template.id} className="flex justify-between items-center p-3 border rounded-md hover:bg-gray-50">
+                            <div>
+                              <p className="font-medium">{template.name}</p>
+                              <p className="text-sm text-gray-500 truncate max-w-[400px]">{template.subject}</p>
+                            </div>
+                            <div className="flex space-x-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => loadTemplate(template)}
+                              >
+                                Load
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deleteTemplate(template.id)}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             
             <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
