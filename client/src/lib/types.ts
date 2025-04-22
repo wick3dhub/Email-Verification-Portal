@@ -23,6 +23,11 @@ export interface Settings {
   securityLevel: number;
   useWildcards: boolean;
   encryptionSalt: string;
+  // Domain settings
+  useCustomDomain: boolean;
+  customDomain: string;
+  domainCnameTarget: string;
+  domainVerified: boolean;
   // Email template settings
   emailSubject: string;
   emailTemplate: string;

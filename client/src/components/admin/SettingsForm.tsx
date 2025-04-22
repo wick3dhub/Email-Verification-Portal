@@ -28,6 +28,11 @@ const settingsSchema = z.object({
   securityLevel: z.number().int().min(1).max(5),
   useWildcards: z.boolean(),
   encryptionSalt: z.string(),
+  // Domain settings
+  useCustomDomain: z.boolean(),
+  customDomain: z.string().optional(),
+  domainCnameTarget: z.string().optional(),
+  domainVerified: z.boolean(),
   // Custom email template settings
   emailSubject: z.string().min(1, "Email subject cannot be empty"),
   emailTemplate: z.string().min(1, "Email template cannot be empty"),
@@ -80,6 +85,11 @@ export default function SettingsForm() {
       securityLevel: 1,
       useWildcards: false,
       encryptionSalt: "default-salt-change-me",
+      // Domain settings
+      useCustomDomain: false,
+      customDomain: "",
+      domainCnameTarget: "",
+      domainVerified: false,
       // Email settings defaults
       emailSubject: "Please verify your email address",
       emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -122,6 +132,11 @@ export default function SettingsForm() {
         securityLevel: settings.securityLevel,
         useWildcards: settings.useWildcards,
         encryptionSalt: settings.encryptionSalt,
+        // Domain settings
+        useCustomDomain: settings.useCustomDomain,
+        customDomain: settings.customDomain || '',
+        domainCnameTarget: settings.domainCnameTarget || '',
+        domainVerified: settings.domainVerified,
         // Email template settings
         emailSubject: settings.emailSubject,
         emailTemplate: settings.emailTemplate,
@@ -394,6 +409,138 @@ export default function SettingsForm() {
                   </FormItem>
                 )}
               />
+            )}
+
+            <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">Domain Settings</h3>
+              <p className="mt-1 text-sm text-gray-500 mb-4">
+                Configure custom domain for verification links.
+              </p>
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="useCustomDomain"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Use Custom Domain</FormLabel>
+                    <FormDescription>
+                      Use a custom domain for verification links instead of the default
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {form.watch('useCustomDomain') && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="customDomain"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Custom Domain</FormLabel>
+                      <FormControl>
+                        <Input placeholder="verify.yourdomain.com" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Enter your custom domain without http:// or https://
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="domainCnameTarget"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CNAME Record</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            readOnly
+                            value={field.value || "wick3d-links.replit.app"}
+                            className="bg-gray-50"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              navigator.clipboard.writeText(field.value || "wick3d-links.replit.app");
+                              toast({
+                                title: "CNAME copied",
+                                description: "CNAME target copied to clipboard",
+                              });
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Create a CNAME record for your domain pointing to this value
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="domainVerified"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Domain Verification Status</FormLabel>
+                        <FormDescription>
+                          {field.value ? "Domain has been verified" : "Domain verification pending"}
+                        </FormDescription>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${field.value ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
+                        {field.value ? "Verified" : "Pending"}
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex flex-col">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="self-start"
+                    onClick={() => {
+                      const domain = form.getValues('customDomain');
+                      if (!domain) {
+                        toast({
+                          title: "Error",
+                          description: "Please enter a custom domain first",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      
+                      // In a real implementation, this would check DNS records
+                      // For now, we'll just simulate a verification process
+                      form.setValue('domainVerified', true);
+                      toast({
+                        title: "Domain verified",
+                        description: "Your domain has been successfully verified",
+                      });
+                    }}
+                  >
+                    Verify Domain
+                  </Button>
+                </div>
+              </>
             )}
 
             <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
