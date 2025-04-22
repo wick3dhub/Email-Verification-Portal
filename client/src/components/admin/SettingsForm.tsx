@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import React, { useEffect, useMemo } from "react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Settings } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,7 +61,6 @@ type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 export default function SettingsForm() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // Fetch current settings
   const { data: settings, isLoading, error } = useQuery<Settings>({
@@ -600,14 +599,16 @@ export default function SettingsForm() {
                   </FormControl>
                   <FormDescription>
                     Higher levels provide stronger security but slower generation.
-                    <ul className="list-disc pl-5 mt-2 space-y-1">
+                  </FormDescription>
+                  <div className="mt-2">
+                    <ul className="list-disc pl-5 space-y-1 text-sm text-gray-500">
                       <li>Level 1: Basic random hexadecimal string (fastest)</li>
                       <li>Level 2: Basic + timestamp-based component</li>
                       <li>Level 3: Level 2 + domain-specific signature</li>
                       <li>Level 4: Level 3 + HMAC-based encryption</li>
                       <li>Level 5: Level 4 + Double-layered encryption (slowest)</li>
                     </ul>
-                  </FormDescription>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
