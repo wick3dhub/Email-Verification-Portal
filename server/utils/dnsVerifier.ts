@@ -9,10 +9,6 @@ import dns from 'dns';
 import { promisify } from 'util';
 import retry from 'async-retry';
 
-// We're using any type for async-retry since we don't have type definitions
-// This is acceptable for a third-party library without type definitions
-const asyncRetry: any = retry;
-
 // Promisify DNS functions
 const resolveCname = promisify(dns.resolveCname);
 const resolveNs = promisify(dns.resolveNs);
@@ -115,10 +111,10 @@ export async function verifyCnameRecord(
         records: cnameRecords
       };
     }
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
-      error: `DNS verification failed: ${error.message}`,
+      error: `DNS verification failed: ${error.message || 'Unknown error'}`,
       details: error
     };
   }
@@ -153,7 +149,7 @@ export async function verifyDomain(
         async () => {
           try {
             return await resolveTxt(domain);
-          } catch (error) {
+          } catch (error: any) {
             if (error.code === 'ENOTFOUND' || error.code === 'ENODATA') {
               throw error; // This will trigger a retry
             }
@@ -181,7 +177,7 @@ export async function verifyDomain(
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       // Ignore TXT errors, we'll return the original CNAME error
       console.error("Error checking TXT records:", error);
     }
@@ -193,10 +189,10 @@ export async function verifyDomain(
       details: cnameResult.details,
       records: cnameResult.records
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
-      error: `Domain verification failed: ${error.message}`,
+      error: `Domain verification failed: ${error.message || 'Unknown error'}`,
       details: error
     };
   }

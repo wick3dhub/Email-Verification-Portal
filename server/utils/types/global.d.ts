@@ -1,3 +1,9 @@
+// Global type declarations for the project
+
+// Type declaration for dns-packet
+declare module 'dns-packet';
+
+// Type declaration for async-retry
 declare module 'async-retry' {
   interface RetryOptions {
     retries?: number;
