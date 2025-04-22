@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Resend verification for an email
   app.post("/api/verification/resend", async (req: Request, res: Response) => {
     try {
-      const { email } = req.body;
+      const { email, useCustomTemplate = false } = req.body;
       
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
@@ -176,10 +176,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt
       });
       
+      // Get verification URL
+      const verificationUrl = `${req.protocol}://${req.get('host')}/verify/${verificationLink.code}`;
+      
+      if (useCustomTemplate) {
+        try {
+          // Get the settings for the custom message template
+          const settings = await storage.getSettings();
+          
+          if (settings) {
+            // Prepare the email content from the template
+            let emailContent = settings.emailTemplate || "Please verify your email at: {link}";
+            // Replace the {link} placeholder with the actual verification URL
+            emailContent = emailContent.replace(/{link}/g, verificationUrl);
+            
+            // In a production environment, this is where you would send the email
+            // For this project, we're just demonstrating the template replacement
+            console.log(`Would send email to ${email} with subject: "${settings.emailSubject}"`);
+            console.log(`Email content: ${emailContent}`);
+            
+            return res.status(200).json({ 
+              email: verificationLink.email,
+              code: verificationLink.code,
+              url: `/verify/${verificationLink.code}`,
+              message: "Verification link resent with custom template"
+            });
+          }
+        } catch (err) {
+          console.error("Error processing custom template:", err);
+          // Continue with default response if template processing fails
+        }
+      }
+      
+      // Default response if custom template was not requested or processing failed
       return res.status(200).json({ 
         email: verificationLink.email,
         code: verificationLink.code,
-        url: `/verify/${verificationLink.code}`
+        url: `/verify/${verificationLink.code}`,
+        message: "Verification link resent"
       });
     } catch (error) {
       console.error("Error resending verification link:", error);

@@ -75,14 +75,17 @@ export default function VerificationStatusTable() {
   // Resend verification link mutation
   const resendMutation = useMutation({
     mutationFn: async (email: string) => {
-      const res = await apiRequest("POST", "/api/verification/resend", { email });
+      const res = await apiRequest("POST", "/api/verification/resend", { 
+        email,
+        useCustomTemplate: true // Signal the server to use custom message template from settings
+      });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/verification/links"] });
       toast({
         title: "Verification link resent",
-        description: "A new verification link has been generated and sent.",
+        description: data.message || "A new verification link has been generated and sent.",
       });
     },
     onError: (error) => {

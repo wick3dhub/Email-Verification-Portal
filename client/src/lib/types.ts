@@ -23,6 +23,15 @@ export interface Settings {
   securityLevel: number;
   useWildcards: boolean;
   encryptionSalt: string;
+  // Email template settings
+  emailSubject: string;
+  emailTemplate: string;
+  senderEmail: string;
+  senderName: string;
+  smtpServer: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPassword: string;
 }
 
 export interface AuthUser {

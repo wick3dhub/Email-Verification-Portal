@@ -24,6 +24,15 @@ const settingsSchema = z.object({
   enableBotProtection: z.boolean(),
   customThankYouPage: z.string(),
   useCustomThankYouPage: z.boolean(),
+  // Custom email template settings
+  emailSubject: z.string().min(1, "Email subject cannot be empty"),
+  emailTemplate: z.string().min(1, "Email template cannot be empty"),
+  senderEmail: z.string().email("Please enter a valid email address"),
+  senderName: z.string().min(1, "Sender name cannot be empty"),
+  smtpServer: z.string().min(1, "SMTP server cannot be empty"),
+  smtpPort: z.number().int().min(1, "Port must be at least 1").max(65535, "Port must be at most 65535"),
+  smtpUser: z.string().optional(),
+  smtpPassword: z.string().optional(),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -50,6 +59,15 @@ export default function SettingsForm() {
       enableBotProtection: true,
       customThankYouPage: "",
       useCustomThankYouPage: false,
+      // Email settings defaults
+      emailSubject: "Please verify your email address",
+      emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
+      senderEmail: "no-reply@wick3d-links.com",
+      senderName: "Wick3d Link Portal",
+      smtpServer: "localhost",
+      smtpPort: 25,
+      smtpUser: "",
+      smtpPassword: "",
     },
   });
 
@@ -66,6 +84,15 @@ export default function SettingsForm() {
         enableBotProtection: settings.enableBotProtection,
         customThankYouPage: settings.customThankYouPage,
         useCustomThankYouPage: settings.useCustomThankYouPage,
+        // Email template settings
+        emailSubject: settings.emailSubject,
+        emailTemplate: settings.emailTemplate,
+        senderEmail: settings.senderEmail,
+        senderName: settings.senderName,
+        smtpServer: settings.smtpServer,
+        smtpPort: settings.smtpPort,
+        smtpUser: settings.smtpUser || '',
+        smtpPassword: settings.smtpPassword || '',
       });
     }
   }, [settings, form]);
@@ -318,6 +345,143 @@ export default function SettingsForm() {
               />
             )}
             
+            <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">Email Template Settings</h3>
+              <p className="mt-1 text-sm text-gray-500 mb-4">
+                Configure email templates for verification emails. Use {'{link}'} in your template to include the verification link.
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="emailSubject"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Subject</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Please verify your email address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="emailTemplate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Template</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal"
+                      className="min-h-[200px] font-mono"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Use {'{link}'} as a placeholder for the verification link. This will be replaced with the actual link when the email is sent.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="senderName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sender Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Wick3d Link Portal" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="senderEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sender Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="no-reply@wick3d-links.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="smtpServer"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SMTP Server</FormLabel>
+                    <FormControl>
+                      <Input placeholder="smtp.example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="smtpPort"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SMTP Port</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="25"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 25)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="smtpUser"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SMTP Username (optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="username" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="smtpPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SMTP Password (optional)</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <div className="flex justify-end">
               <Button
                 type="submit"

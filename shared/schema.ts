@@ -43,15 +43,15 @@ export const settings = pgTable("settings", {
   securityLevel: integer("security_level").notNull().default(1),
   useWildcards: boolean("use_wildcards").notNull().default(false),
   encryptionSalt: text("encryption_salt").notNull().default(""),
-  // Custom message settings for resending verification emails
+  // Email template settings
   emailSubject: text("email_subject").notNull().default("Please verify your email address"),
   emailTemplate: text("email_template").notNull().default("Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal"),
+  senderEmail: text("sender_email").notNull().default("no-reply@wick3d-links.com"),
+  senderName: text("sender_name").notNull().default("Wick3d Link Portal"),
   smtpServer: text("smtp_server").notNull().default("localhost"),
   smtpPort: integer("smtp_port").notNull().default(25),
   smtpUser: text("smtp_user").notNull().default(""),
   smtpPassword: text("smtp_password").notNull().default(""),
-  senderEmail: text("sender_email").notNull().default("no-reply@wick3d-links.com"),
-  senderName: text("sender_name").notNull().default("Wick3d Link Portal"),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).pick({
