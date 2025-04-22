@@ -390,6 +390,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Settings management
+  // Get available domains for selection
+  app.get("/api/domain/available", async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getSettings();
+      
+      if (!settings) {
+        return res.status(404).json({
+          success: false,
+          message: "Settings not found"
+        });
+      }
+      
+      const defaultDomain = req.get('host') || 'localhost:5000';
+      const domains = [];
+      
+      // Add default domain
+      domains.push({
+        id: 'default',
+        name: defaultDomain,
+        type: 'default'
+      });
+      
+      // Add custom domain if enabled and verified
+      if (settings.useCustomDomain && settings.customDomain && settings.domainVerified) {
+        domains.push({
+          id: settings.customDomain,
+          name: settings.customDomain,
+          type: 'primary'
+        });
+        
+        // Add additional domains
+        try {
+          const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+          if (Array.isArray(additionalDomains) && additionalDomains.length > 0) {
+            additionalDomains.forEach(domain => {
+              domains.push({
+                id: domain,
+                name: domain,
+                type: 'additional'
+              });
+            });
+          }
+        } catch (err) {
+          console.error("Error parsing additional domains:", err);
+        }
+        
+        // Add random option if there are multiple domains
+        if (domains.length > 2) { // More than default + primary
+          domains.push({
+            id: 'random',
+            name: 'Random Domain (rotation)',
+            type: 'option'
+          });
+        }
+      }
+      
+      return res.status(200).json({
+        success: true,
+        domains
+      });
+    } catch (error) {
+      console.error("Error fetching available domains:", error);
+      return res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to fetch available domains"
+      });
+    }
+  });
+
   app.get("/api/settings", async (req: Request, res: Response) => {
     try {
       const settings = await storage.getSettings();
@@ -401,6 +470,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Domain verification endpoint
+  // Add or remove additional domains
+  app.post("/api/domain/manage", async (req: Request, res: Response) => {
+    try {
+      const { action, domain } = req.body;
+      
+      if (!domain || !action) {
+        return res.status(400).json({
+          success: false,
+          message: "Domain and action are required"
+        });
+      }
+      
+      // Get existing settings
+      const settings = await storage.getSettings();
+      
+      if (!settings) {
+        return res.status(404).json({
+          success: false,
+          message: "Settings not found"
+        });
+      }
+      
+      let additionalDomains: string[] = [];
+      
+      // Parse existing additional domains
+      try {
+        additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+        if (!Array.isArray(additionalDomains)) {
+          additionalDomains = [];
+        }
+      } catch (err) {
+        console.error("Error parsing additional domains:", err);
+        additionalDomains = [];
+      }
+      
+      // Handle add/remove actions
+      if (action === 'add') {
+        // Validate domain format (simple validation)
+        if (!domain.match(/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid domain format"
+          });
+        }
+        
+        // Check if domain already exists
+        if (additionalDomains.includes(domain)) {
+          return res.status(400).json({
+            success: false,
+            message: "Domain already exists in the additional domains list"
+          });
+        }
+        
+        // Add the new domain
+        additionalDomains.push(domain);
+      } else if (action === 'remove') {
+        // Remove the domain
+        additionalDomains = additionalDomains.filter(d => d !== domain);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid action. Expected 'add' or 'remove'"
+        });
+      }
+      
+      // Update settings
+      const updatedSettings = await storage.updateSettings({
+        additionalDomains: JSON.stringify(additionalDomains)
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: action === 'add' ? "Domain added successfully" : "Domain removed successfully",
+        domains: additionalDomains,
+        settings: updatedSettings
+      });
+    } catch (error) {
+      console.error("Error managing domains:", error);
+      return res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to manage domains"
+      });
+    }
+  });
+
   app.post("/api/domain/verify", async (req: Request, res: Response) => {
     try {
       const { domain } = req.body;
@@ -468,6 +622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customDomain: z.string().optional(),
         domainCnameTarget: z.string().optional(),
         domainVerified: z.boolean().optional(),
+        additionalDomains: z.string().optional(), // JSON array of additional domains
         // Email template settings
         emailSubject: z.string().optional(),
         emailTemplate: z.string().optional(),

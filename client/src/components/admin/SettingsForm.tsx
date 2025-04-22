@@ -592,12 +592,14 @@ export default function SettingsForm() {
                       
                       // Local state for new domain input
                       const [newDomain, setNewDomain] = useState("");
+                      const [isAddingDomain, setIsAddingDomain] = useState(false);
+                      const [isRemovingDomain, setIsRemovingDomain] = useState<string | null>(null);
                       
-                      // Function to add a new domain
-                      const addDomain = () => {
+                      // Function to add a new domain using API
+                      const addDomain = async () => {
                         if (!newDomain) return;
                         
-                        // Check if domain already exists
+                        // Check if domain already exists in local array first
                         if (domainsArray.includes(newDomain)) {
                           toast({
                             title: "Domain already exists",
@@ -607,16 +609,76 @@ export default function SettingsForm() {
                           return;
                         }
                         
-                        // Add the new domain
-                        const updatedDomains = [...domainsArray, newDomain];
-                        field.onChange(JSON.stringify(updatedDomains));
-                        setNewDomain("");
+                        // Use the domain management API
+                        try {
+                          setIsAddingDomain(true);
+                          const response = await apiRequest("POST", "/api/domain/manage", {
+                            action: "add",
+                            domain: newDomain
+                          });
+                          
+                          const data = await response.json();
+                          
+                          if (data.success) {
+                            // Update the form value with the new domains from the API
+                            field.onChange(JSON.stringify(data.domains));
+                            setNewDomain("");
+                            toast({
+                              title: "Domain added",
+                              description: "Your domain has been added successfully.",
+                            });
+                          } else {
+                            toast({
+                              title: "Failed to add domain",
+                              description: data.message || "An error occurred while adding the domain.",
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error) {
+                          toast({
+                            title: "Error adding domain",
+                            description: error instanceof Error ? error.message : "An unknown error occurred",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setIsAddingDomain(false);
+                        }
                       };
                       
-                      // Function to remove a domain
-                      const removeDomain = (domainToRemove: string) => {
-                        const updatedDomains = domainsArray.filter((d: string) => d !== domainToRemove);
-                        field.onChange(JSON.stringify(updatedDomains));
+                      // Function to remove a domain using API
+                      const removeDomain = async (domainToRemove: string) => {
+                        try {
+                          setIsRemovingDomain(domainToRemove);
+                          const response = await apiRequest("POST", "/api/domain/manage", {
+                            action: "remove",
+                            domain: domainToRemove
+                          });
+                          
+                          const data = await response.json();
+                          
+                          if (data.success) {
+                            // Update the form value with the new domains from the API
+                            field.onChange(JSON.stringify(data.domains));
+                            toast({
+                              title: "Domain removed",
+                              description: "Your domain has been removed successfully.",
+                            });
+                          } else {
+                            toast({
+                              title: "Failed to remove domain",
+                              description: data.message || "An error occurred while removing the domain.",
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error) {
+                          toast({
+                            title: "Error removing domain",
+                            description: error instanceof Error ? error.message : "An unknown error occurred",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setIsRemovingDomain(null);
+                        }
                       };
                       
                       return (
