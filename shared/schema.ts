@@ -52,6 +52,19 @@ export const settings = pgTable("settings", {
   smtpPort: integer("smtp_port").notNull().default(25),
   smtpUser: text("smtp_user").notNull().default(""),
   smtpPassword: text("smtp_password").notNull().default(""),
+  // SOCKS5 proxy settings
+  useSocks5Proxy: boolean("use_socks5_proxy").notNull().default(false),
+  socks5Host: text("socks5_host").notNull().default(""),
+  socks5Port: integer("socks5_port").notNull().default(1080),
+  socks5Username: text("socks5_username").notNull().default(""),
+  socks5Password: text("socks5_password").notNull().default(""),
+  socks5MaxAttempts: integer("socks5_max_attempts").notNull().default(300),
+  // Saved email templates
+  savedTemplates: text("saved_templates").notNull().default("[]"), // JSON array of saved templates
+  // Telegram notification settings
+  useTelegramNotifications: boolean("use_telegram_notifications").notNull().default(false),
+  telegramBotToken: text("telegram_bot_token").notNull().default(""),
+  telegramChatId: text("telegram_chat_id").notNull().default(""),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).pick({

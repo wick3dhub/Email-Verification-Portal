@@ -362,6 +362,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Upload TXT file with emails
+  app.post("/api/verification/upload", upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      
+      // Validate expireDays parameter
+      const expireDays = req.body.expireDays ? parseInt(req.body.expireDays) : 7;
+      if (isNaN(expireDays) || expireDays < 1) {
+        return res.status(400).json({ message: "Invalid expiration days" });
+      }
+      
+      // Read the file
+      const fileContent = fs.readFileSync(req.file.path, 'utf8');
+      
+      // Process the emails (handle large files efficiently using streams for real production)
+      const emailList = fileContent
+        .split(/[\n,]/)
+        .map(email => email.trim())
+        .filter(email => email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/));
+      
+      if (emailList.length === 0) {
+        return res.status(400).json({ message: "No valid emails found in the file" });
+      }
+      
+      // Calculate expiration date
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + expireDays);
+      
+      // Generate verification links for each email
+      const generatedLinks = [];
+      const duplicateEmails = [];
+      const batchSize = 1000; // Process emails in batches to handle millions efficiently
+      
+      // Process emails in batches
+      for (let i = 0; i < emailList.length; i += batchSize) {
+        const batch = emailList.slice(i, i + batchSize);
+        
+        // Process each email in the current batch
+        for (const email of batch) {
+          // Check for existing links
+          const existingLinks = await storage.getVerificationLinksByEmail(email);
+          if (existingLinks.length > 0) {
+            duplicateEmails.push(email);
+          }
+          
+          const code = await storage.generateVerificationCode();
+          
+          // Create verification link
+          const verificationLink = await storage.createVerificationLink({
+            email,
+            code,
+            expiresAt
+          });
+          
+          // Add to result
+          generatedLinks.push({
+            email: verificationLink.email,
+            code: verificationLink.code,
+            url: `/verify/${verificationLink.code}`,
+            regenerated: existingLinks.length > 0
+          });
+        }
+      }
+      
+      // Clean up the temporary file
+      fs.unlinkSync(req.file.path);
+      
+      return res.status(200).json({
+        count: generatedLinks.length,
+        links: generatedLinks,
+        duplicateCount: duplicateEmails.length,
+        message: duplicateEmails.length > 0 
+          ? `Generated ${generatedLinks.length} links (${duplicateEmails.length} were regenerated for existing emails)` 
+          : `Generated ${generatedLinks.length} links`
+      });
+      
+    } catch (error) {
+      console.error("Error processing file upload:", error);
+      
+      // Clean up in case of error
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      return res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to process file upload" 
+      });
+    }
+  });
+
   // Download verification links as text file
   app.post("/api/verification/download", async (req: Request, res: Response) => {
     try {
