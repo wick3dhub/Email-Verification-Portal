@@ -5,6 +5,14 @@ import VerificationProcess from "@/components/VerificationProcess";
 import { Settings } from "@/lib/types";
 import { apiRequest } from "@/lib/queryClient";
 
+// Define the verification response type for reuse
+interface VerificationResponse {
+  botProtectionRequired: boolean;
+  settings: Settings;
+  email: string;
+  success: boolean;
+}
+
 export default function Verification() {
   const [, params] = useRoute("/verify/:code");
   const verificationCode = params?.code;
@@ -26,39 +34,80 @@ export default function Verification() {
       const response = await apiRequest("GET", `/api/verification/verify/${verificationCode}?botcheck=passed`);
       const result = await response.json();
       
-      setVerificationState('success');
-      setSettings(result.settings);
-      setUserEmail(result.email || "");
-      
-      // Handle redirection
-      handleRedirect(result);
+      // Validate response format
+      if (isVerificationResponse(result)) {
+        setVerificationState('success');
+        setSettings(result.settings);
+        setUserEmail(result.email || "");
+        
+        // Handle redirection
+        handleRedirect(result);
+      } else {
+        throw new Error("Invalid response format from server");
+      }
     } catch (err) {
       setVerificationState('error');
       const errMessage = err instanceof Error ? err.message : "Verification failed";
       setErrorMessage(errMessage);
+      console.error("Bot check verification error:", err);
     }
+  };
+  
+  // Type guard to validate verification response
+  const isVerificationResponse = (obj: any): obj is VerificationResponse => {
+    return obj && typeof obj === 'object' && 
+      'botProtectionRequired' in obj && 
+      'settings' in obj && 
+      'email' in obj &&
+      'success' in obj;
   };
   
   // Handle redirection after successful verification
   const handleRedirect = (data: any) => {
-    if (data.settings && data.settings.redirectUrl) {
-      const redirectTimeout = data.settings.showLoadingSpinner 
-        ? (data.settings.loadingDuration * 1000) 
-        : 1000;
-      
-      setTimeout(() => {
-        let redirectUrl = data.settings.redirectUrl;
-        
-        // Handle email autograb feature
-        if (data.settings.useEmailAutograb && data.email) {
-          const paramName = data.settings.emailAutograbParam || 'email';
-          const placeholder = `{${paramName}}`;
-          redirectUrl = redirectUrl.replace(placeholder, encodeURIComponent(data.email));
-        }
-        
-        window.location.href = redirectUrl;
-      }, redirectTimeout);
+    // Use the type guard to check the response
+    if (!isVerificationResponse(data)) {
+      console.error("Invalid data format for redirect:", data);
+      return;
     }
+    
+    const { settings, email } = data;
+    
+    if (!settings || !settings.redirectUrl) {
+      console.warn("No redirect URL configured in settings");
+      return;
+    }
+    
+    // Calculate redirect timeout based on settings
+    const redirectTimeout = settings.showLoadingSpinner && settings.loadingDuration
+      ? (settings.loadingDuration * 1000) 
+      : 1000;
+    
+    setTimeout(() => {
+      // Determine which URL to use
+      let finalUrl = settings.useCustomThankYouPage && settings.customThankYouPage
+        ? settings.customThankYouPage
+        : settings.redirectUrl;
+      
+      // Handle email autograb feature if configured
+      if (settings.useEmailAutograb && email && settings.emailAutograbParam) {
+        const paramName = settings.emailAutograbParam;
+        
+        // Check if we should replace a placeholder or append as query param
+        const placeholder = `{${paramName}}`;
+        if (finalUrl.includes(placeholder)) {
+          // Replace placeholder in URL
+          finalUrl = finalUrl.replace(placeholder, encodeURIComponent(email));
+        } else {
+          // Append as query parameter
+          const separator = finalUrl.includes('?') ? '&' : '?';
+          finalUrl = `${finalUrl}${separator}${paramName}=${encodeURIComponent(email)}`;
+        }
+      }
+      
+      // Redirect to final URL
+      console.log(`Redirecting to: ${finalUrl}`);
+      window.location.href = finalUrl;
+    }, redirectTimeout);
   };
   
   useEffect(() => {
@@ -69,21 +118,7 @@ export default function Verification() {
       const errMessage = error instanceof Error ? error.message : "Verification failed";
       setErrorMessage(errMessage);
     } else if (data) {
-      // Define a type guard to check for the expected response format
-      const isVerificationResponse = (obj: any): obj is { 
-        botProtectionRequired: boolean; 
-        settings: Settings; 
-        email: string;
-        success: boolean; 
-      } => {
-        return obj && typeof obj === 'object' && 
-          'botProtectionRequired' in obj && 
-          'settings' in obj && 
-          'email' in obj &&
-          'success' in obj;
-      };
-      
-      // Ensure the response has the expected format
+      // Ensure the response has the expected format using our common type guard
       if (isVerificationResponse(data)) {
         // Check if bot protection is required
         if (data.botProtectionRequired) {
