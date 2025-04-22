@@ -48,6 +48,7 @@ export const settings = pgTable("settings", {
   customDomain: text("custom_domain").notNull().default(""),
   domainCnameTarget: text("domain_cname_target").notNull().default(""),
   domainVerified: boolean("domain_verified").notNull().default(false),
+  additionalDomains: text("additional_domains").notNull().default("[]"), // JSON array of additional domains
   // Email template settings
   emailSubject: text("email_subject").notNull().default("Please verify your email address"),
   emailTemplate: text("email_template").notNull().default("Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal"),
@@ -90,6 +91,7 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   customDomain: true,
   domainCnameTarget: true,
   domainVerified: true,
+  additionalDomains: true,
   // Email template settings
   emailSubject: true,
   emailTemplate: true,

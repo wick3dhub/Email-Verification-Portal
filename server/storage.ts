@@ -73,6 +73,7 @@ export class MemStorage implements IStorage {
       customDomain: "",
       domainCnameTarget: "",
       domainVerified: false,
+      additionalDomains: "[]", // JSON array of additional domains
       securityLevel: 1,
       useWildcards: false,
       encryptionSalt: "default-salt-change-me",
@@ -190,6 +191,7 @@ export class MemStorage implements IStorage {
         customDomain: data.customDomain || "",
         domainCnameTarget: data.domainCnameTarget || "",
         domainVerified: data.domainVerified !== undefined ? data.domainVerified : false,
+        additionalDomains: data.additionalDomains || "[]",
         // Custom email settings
         emailSubject: data.emailSubject || "Please verify your email address",
         emailTemplate: data.emailTemplate || "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -234,6 +236,7 @@ export class MemStorage implements IStorage {
         customDomain: data.customDomain !== undefined ? data.customDomain : this.settingsData.customDomain,
         domainCnameTarget: data.domainCnameTarget !== undefined ? data.domainCnameTarget : this.settingsData.domainCnameTarget,
         domainVerified: data.domainVerified !== undefined ? data.domainVerified : this.settingsData.domainVerified,
+        additionalDomains: data.additionalDomains !== undefined ? data.additionalDomains : this.settingsData.additionalDomains,
         // Email settings
         emailSubject: data.emailSubject !== undefined ? data.emailSubject : this.settingsData.emailSubject,
         emailTemplate: data.emailTemplate !== undefined ? data.emailTemplate : this.settingsData.emailTemplate,
@@ -371,6 +374,7 @@ export class DatabaseStorage implements IStorage {
         customDomain: "",
         domainCnameTarget: "",
         domainVerified: false,
+        additionalDomains: "[]",
         // Custom message settings
         emailSubject: "Please verify your email address",
         emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
