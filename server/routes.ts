@@ -226,7 +226,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailAutograbParam: z.string().optional(),
         enableBotProtection: z.boolean().optional(),
         customThankYouPage: z.string().optional(),
-        useCustomThankYouPage: z.boolean().optional()
+        useCustomThankYouPage: z.boolean().optional(),
+        securityLevel: z.number().int().min(1).max(5).optional(),
+        useWildcards: z.boolean().optional(),
+        encryptionSalt: z.string().optional()
       });
       
       const validatedData = settingsSchema.parse(req.body);
