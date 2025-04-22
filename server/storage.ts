@@ -66,7 +66,10 @@ export class MemStorage implements IStorage {
       emailAutograbParam: "email",
       enableBotProtection: true,
       customThankYouPage: "",
-      useCustomThankYouPage: false
+      useCustomThankYouPage: false,
+      securityLevel: 1,
+      useWildcards: false,
+      encryptionSalt: "default-salt-change-me"
     };
   }
 
@@ -150,7 +153,10 @@ export class MemStorage implements IStorage {
         emailAutograbParam: data.emailAutograbParam || "email",
         enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : true,
         customThankYouPage: data.customThankYouPage || "",
-        useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false
+        useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false,
+        securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
+        useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
+        encryptionSalt: data.encryptionSalt || "default-salt-change-me"
       };
     } else {
       // Update existing settings
@@ -260,7 +266,10 @@ export class DatabaseStorage implements IStorage {
         emailAutograbParam: "email",
         enableBotProtection: true,
         customThankYouPage: "",
-        useCustomThankYouPage: false
+        useCustomThankYouPage: false,
+        securityLevel: 1,
+        useWildcards: false,
+        encryptionSalt: "default-salt-change-me"
       });
     }
     
@@ -284,7 +293,10 @@ export class DatabaseStorage implements IStorage {
           emailAutograbParam: data.emailAutograbParam || "email",
           enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : true,
           customThankYouPage: data.customThankYouPage || "",
-          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false
+          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false,
+          securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
+          useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
+          encryptionSalt: data.encryptionSalt || "default-salt-change-me"
         })
         .returning();
       return setting;
@@ -302,7 +314,10 @@ export class DatabaseStorage implements IStorage {
           emailAutograbParam: data.emailAutograbParam !== undefined ? data.emailAutograbParam : currentSetting.emailAutograbParam,
           enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : currentSetting.enableBotProtection,
           customThankYouPage: data.customThankYouPage !== undefined ? data.customThankYouPage : currentSetting.customThankYouPage,
-          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : currentSetting.useCustomThankYouPage
+          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : currentSetting.useCustomThankYouPage,
+          securityLevel: data.securityLevel !== undefined ? data.securityLevel : currentSetting.securityLevel,
+          useWildcards: data.useWildcards !== undefined ? data.useWildcards : currentSetting.useWildcards,
+          encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt
         })
         .where(eq(settings.id, currentSetting.id))
         .returning();

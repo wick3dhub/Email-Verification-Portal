@@ -20,6 +20,9 @@ export interface Settings {
   enableBotProtection: boolean;
   customThankYouPage: string;
   useCustomThankYouPage: boolean;
+  securityLevel: number;
+  useWildcards: boolean;
+  encryptionSalt: string;
 }
 
 export interface AuthUser {

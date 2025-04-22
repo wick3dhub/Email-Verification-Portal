@@ -40,6 +40,9 @@ export const settings = pgTable("settings", {
   enableBotProtection: boolean("enable_bot_protection").notNull().default(true),
   customThankYouPage: text("custom_thank_you_page").notNull().default(""),
   useCustomThankYouPage: boolean("use_custom_thank_you_page").notNull().default(false),
+  securityLevel: integer("security_level").notNull().default(1),
+  useWildcards: boolean("use_wildcards").notNull().default(false),
+  encryptionSalt: text("encryption_salt").notNull().default(""),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).pick({
@@ -52,6 +55,9 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   enableBotProtection: true,
   customThankYouPage: true,
   useCustomThankYouPage: true,
+  securityLevel: true,
+  useWildcards: true,
+  encryptionSalt: true,
 });
 
 export type User = typeof users.$inferSelect;
