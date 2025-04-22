@@ -37,16 +37,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = emailBatchSchema.parse(req.body);
       
-      // Process emails (accept comma or newline separated)
+      // Process emails from either newline/comma-separated input or .txt file content
       const emailsText = validatedData.emails;
       const emailList = emailsText
         .split(/[\n,]/)
         .map(email => email.trim())
-        .filter(email => email.length > 0);
+        .filter(email => email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/));
       
       if (emailList.length === 0) {
         return res.status(400).json({ message: "No valid emails provided" });
       }
+      
+      // Track duplicates for messaging
+      const duplicateEmails = [];
       
       // Calculate expiration date
       const expiresAt = new Date();
@@ -56,7 +59,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const generatedLinks = [];
       
       for (const email of emailList) {
-        const code = storage.generateVerificationCode();
+        // Check for existing links for this email
+        const existingLinks = await storage.getVerificationLinksByEmail(email);
+        if (existingLinks.length > 0) {
+          duplicateEmails.push(email);
+        }
+        
+        const code = await storage.generateVerificationCode();
         
         // Create verification link in storage
         const verificationLink = await storage.createVerificationLink({
@@ -69,13 +78,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         generatedLinks.push({
           email: verificationLink.email,
           code: verificationLink.code,
-          url: `/verify/${verificationLink.code}`
+          url: `/verify/${verificationLink.code}`,
+          regenerated: existingLinks.length > 0
         });
       }
       
       return res.status(200).json({ 
         count: generatedLinks.length,
-        links: generatedLinks
+        links: generatedLinks,
+        duplicateCount: duplicateEmails.length,
+        message: duplicateEmails.length > 0 
+          ? `Generated ${generatedLinks.length} links (${duplicateEmails.length} were regenerated for existing emails)` 
+          : `Generated ${generatedLinks.length} links`
       });
     } catch (error) {
       console.error("Error generating verification links:", error);
@@ -86,22 +100,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all verification links
   app.get("/api/verification/links", async (req: Request, res: Response) => {
     try {
-      const links = await storage.getAllVerificationLinks();
+      const groupBySession = req.query.groupBySession === 'true';
       
-      // Format the response
-      const formattedLinks = links.map(link => ({
-        id: link.id,
-        email: link.email,
-        status: link.status,
-        createdAt: link.createdAt,
-        expiresAt: link.expiresAt,
-        verifiedAt: link.verifiedAt
-      }));
-      
-      return res.status(200).json(formattedLinks);
+      if (groupBySession && 'getVerificationLinksGroupedBySession' in storage) {
+        // Use the custom storage method for grouped sessions if available
+        const groupedLinks = await (storage as any).getVerificationLinksGroupedBySession();
+        return res.status(200).json(groupedLinks);
+      } else {
+        // Use standard getAllVerificationLinks method
+        const links = await storage.getAllVerificationLinks();
+        
+        // Format the response
+        const formattedLinks = links.map(link => ({
+          id: link.id,
+          email: link.email,
+          status: link.status,
+          createdAt: link.createdAt,
+          expiresAt: link.expiresAt,
+          verifiedAt: link.verifiedAt,
+          regenerated: (link as any).regenerated || false
+        }));
+        
+        return res.status(200).json(formattedLinks);
+      }
     } catch (error) {
       console.error("Error fetching verification links:", error);
       return res.status(500).json({ message: "Failed to fetch verification links" });
+    }
+  });
+  
+  // Clear verification links
+  app.post("/api/verification/clear", async (req: Request, res: Response) => {
+    try {
+      const { olderThanDays } = req.body;
+      
+      if ('clearVerificationLinks' in storage) {
+        const clearedCount = await (storage as any).clearVerificationLinks(
+          olderThanDays ? parseInt(olderThanDays) : undefined
+        );
+        
+        return res.status(200).json({ 
+          success: true, 
+          clearedCount,
+          message: `Successfully cleared ${clearedCount} verification links`
+        });
+      } else {
+        return res.status(501).json({ message: "Clear function not implemented" });
+      }
+    } catch (error) {
+      console.error("Error clearing verification links:", error);
+      return res.status(500).json({ message: "Failed to clear verification links" });
     }
   });
   
@@ -118,8 +166,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
       
-      // Generate new code
-      const code = storage.generateVerificationCode();
+      // Generate new code with enhanced security
+      const code = await storage.generateVerificationCode();
       
       // Create new verification link
       const verificationLink = await storage.createVerificationLink({
