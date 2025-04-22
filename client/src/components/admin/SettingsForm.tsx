@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Settings } from "@/lib/types";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
 const settingsSchema = z.object({
   redirectUrl: z.string().url("Please enter a valid URL"),
@@ -90,6 +90,7 @@ export default function SettingsForm() {
       customDomain: "",
       domainCnameTarget: "",
       domainVerified: false,
+      additionalDomains: "[]",
       // Email settings defaults
       emailSubject: "Please verify your email address",
       emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -137,6 +138,7 @@ export default function SettingsForm() {
         customDomain: settings.customDomain || '',
         domainCnameTarget: settings.domainCnameTarget || '',
         domainVerified: settings.domainVerified,
+        additionalDomains: settings.additionalDomains,
         // Email template settings
         emailSubject: settings.emailSubject,
         emailTemplate: settings.emailTemplate,
@@ -572,6 +574,102 @@ export default function SettingsForm() {
                       "Verify Domain"
                     )}
                   </Button>
+                </div>
+
+                {/* Additional Domains Section */}
+                <div className="mt-6 border-t border-gray-200 pt-6">
+                  <h4 className="text-sm font-medium text-gray-900 mb-4">Additional Domains</h4>
+                  <p className="mt-1 text-sm text-gray-500 mb-4">
+                    Configure multiple domains to use for verification links
+                  </p>
+                  
+                  <FormField
+                    control={form.control}
+                    name="additionalDomains"
+                    render={({ field }) => {
+                      // Parse the JSON string to an array
+                      const domainsArray = field.value ? JSON.parse(field.value) : [];
+                      
+                      // Local state for new domain input
+                      const [newDomain, setNewDomain] = useState("");
+                      
+                      // Function to add a new domain
+                      const addDomain = () => {
+                        if (!newDomain) return;
+                        
+                        // Check if domain already exists
+                        if (domainsArray.includes(newDomain)) {
+                          toast({
+                            title: "Domain already exists",
+                            description: "This domain is already in your list.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        
+                        // Add the new domain
+                        const updatedDomains = [...domainsArray, newDomain];
+                        field.onChange(JSON.stringify(updatedDomains));
+                        setNewDomain("");
+                      };
+                      
+                      // Function to remove a domain
+                      const removeDomain = (domainToRemove: string) => {
+                        const updatedDomains = domainsArray.filter((d: string) => d !== domainToRemove);
+                        field.onChange(JSON.stringify(updatedDomains));
+                      };
+                      
+                      return (
+                        <FormItem>
+                          <div className="flex items-end space-x-2 mb-4">
+                            <div className="flex-1">
+                              <FormLabel>Add Domain</FormLabel>
+                              <Input 
+                                value={newDomain} 
+                                onChange={(e) => setNewDomain(e.target.value)}
+                                placeholder="verify2.yourdomain.com" 
+                              />
+                            </div>
+                            <Button 
+                              type="button" 
+                              onClick={addDomain}
+                              disabled={!newDomain}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            {domainsArray.length > 0 ? (
+                              <div className="border rounded-md">
+                                <ul className="divide-y">
+                                  {domainsArray.map((domain: string, index: number) => (
+                                    <li key={index} className="flex items-center justify-between p-3">
+                                      <span className="text-sm">{domain}</span>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeDomain(domain)}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500">No additional domains added</p>
+                            )}
+                          </div>
+                          <FormDescription>
+                            Add multiple domains to use for verification links. Each domain must be configured with the same CNAME record.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
                 </div>
               </>
             )}
