@@ -33,6 +33,7 @@ const settingsSchema = z.object({
   customDomain: z.string().optional(),
   domainCnameTarget: z.string().optional(),
   domainVerified: z.boolean(),
+  additionalDomains: z.string(),
   // Custom email template settings
   emailSubject: z.string().min(1, "Email subject cannot be empty"),
   emailTemplate: z.string().min(1, "Email template cannot be empty"),

@@ -28,6 +28,7 @@ export interface Settings {
   customDomain: string;
   domainCnameTarget: string;
   domainVerified: boolean;
+  additionalDomains: string; // JSON array of additional domains
   // Email template settings
   emailSubject: string;
   emailTemplate: string;
