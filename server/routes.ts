@@ -5,8 +5,37 @@ import { z } from "zod";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import multer from "multer";
+import os from "os";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Configure multer for file uploads
+  const upload = multer({ 
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        const tempDir = path.join(os.tmpdir(), 'verification-uploads');
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(tempDir)){
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        cb(null, tempDir);
+      },
+      filename: (req, file, cb) => {
+        const uniquePrefix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniquePrefix + '-' + file.originalname);
+      }
+    }),
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50MB max size to handle large lists
+    },
+    fileFilter: (req, file, cb) => {
+      // Accept only .txt files
+      if (path.extname(file.originalname).toLowerCase() !== '.txt') {
+        return cb(new Error('Only .txt files are allowed'));
+      }
+      cb(null, true);
+    }
+  });
   // Authentication routes
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     const { username, password } = req.body;
