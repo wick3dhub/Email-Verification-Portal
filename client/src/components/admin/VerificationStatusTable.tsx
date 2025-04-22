@@ -3,14 +3,30 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { VerificationLink } from "@/lib/types";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "@/components/ui/accordion";
+import { format, isToday, isYesterday, formatDistanceToNow, isSameDay } from "date-fns";
+import { 
+  Loader2, 
+  Trash2, 
+  Inbox, 
+  RefreshCw, 
+  Clock, 
+  Calendar, 
+  MailCheck,
+  AlertTriangle
+} from "lucide-react";
 
 export default function VerificationStatusTable() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -18,9 +34,42 @@ export default function VerificationStatusTable() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch verification links
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["/api/verification/links"],
+  // State for view mode: 'list' (traditional) or 'sessions' (grouped by session date)
+  const [viewMode, setViewMode] = useState<'list' | 'sessions'>('list');
+  
+  // Fetch verification links with grouping by session if needed
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["/api/verification/links", { groupBySession: viewMode === 'sessions' }],
+    queryFn: async ({ queryKey }) => {
+      const [_, { groupBySession }] = queryKey as [string, { groupBySession: boolean }];
+      const res = await apiRequest(
+        "GET", 
+        `/api/verification/links${groupBySession ? '?groupBySession=true' : ''}`
+      );
+      return res.json();
+    }
+  });
+  
+  // Clear cache mutation
+  const clearCacheMutation = useMutation({
+    mutationFn: async (olderThanDays?: number) => {
+      const res = await apiRequest("POST", "/api/verification/clear", { olderThanDays });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/verification/links"] });
+      toast({
+        title: "Cache cleared",
+        description: data.message || `Successfully cleared ${data.clearedCount} verification links`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to clear cache",
+        variant: "destructive",
+      });
+    },
   });
 
   // Resend verification link mutation
@@ -113,18 +162,76 @@ export default function VerificationStatusTable() {
     );
   }
 
+  // Helper for session view
+  const formatSessionDate = (date: string) => {
+    const dateObj = new Date(date);
+    
+    if (isToday(dateObj)) {
+      return 'Today';
+    } else if (isYesterday(dateObj)) {
+      return 'Yesterday';
+    } else {
+      return format(dateObj, 'MMMM d, yyyy');
+    }
+  };
+  
+  // Function to handle clearing cache with different timeframes
+  const handleClearCache = (days?: number) => {
+    if (days === undefined || days <= 0) {
+      // Confirm before clearing all links
+      if (window.confirm('Are you sure you want to clear ALL verification links? This action cannot be undone.')) {
+        clearCacheMutation.mutate();
+      }
+    } else {
+      clearCacheMutation.mutate(days);
+    }
+  };
+  
   return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Verification Status</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Monitor which email addresses have completed verification.
-          </p>
+    <Card className="overflow-hidden">
+      <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+          <div>
+            <CardTitle className="text-xl font-bold">Verification Status</CardTitle>
+            <CardDescription>
+              Monitor email verification progress
+            </CardDescription>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'sessions')}>
+              <TabsList>
+                <TabsTrigger value="list">List View</TabsTrigger>
+                <TabsTrigger value="sessions">Sessions</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="flex items-center space-x-2">
+              <Select onValueChange={(value) => handleClearCache(parseInt(value))}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Clear Cache" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Clear older than 7 Days</SelectItem>
+                  <SelectItem value="30">Clear older than 30 Days</SelectItem>
+                  <SelectItem value="90">Clear older than 90 Days</SelectItem>
+                  <SelectItem value="0">Clear All</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => refetch()}
+                title="Refresh"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
+      </CardHeader>
 
+      <CardContent className="p-0">
         {/* Filters and Search */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
           <div className="flex flex-col md:flex-row justify-between space-y-3 md:space-y-0 md:space-x-4">
             <div className="w-full md:w-64">
               <Select
@@ -161,63 +268,155 @@ export default function VerificationStatusTable() {
           </div>
         </div>
 
-        {/* Status Table */}
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Generated Date</TableHead>
-                <TableHead>Expires</TableHead>
-                <TableHead>Verification Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLinks.length === 0 ? (
+        {/* Session View */}
+        {viewMode === 'sessions' && Array.isArray(data) && !('id' in data[0]) ? (
+          <div className="overflow-x-auto p-4">
+            <Accordion type="single" collapsible className="w-full">
+              {(data as any[]).map((session, index) => (
+                <AccordionItem key={index} value={`session-${index}`}>
+                  <AccordionTrigger className="py-4 px-2">
+                    <div className="flex items-center space-x-3">
+                      <Calendar className="h-5 w-5 text-gray-500" />
+                      <span className="font-medium">
+                        Session: {formatSessionDate(session.date)}
+                      </span>
+                      <div className="ml-2 flex items-center space-x-1">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 rounded-full">
+                          {session.count} emails
+                        </Badge>
+                        {session.verifiedCount > 0 && (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 rounded-full">
+                            {session.verifiedCount} verified
+                          </Badge>
+                        )}
+                        {session.pendingCount > 0 && (
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 rounded-full">
+                            {session.pendingCount} pending
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="overflow-x-auto pl-10">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Expires</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {session.links.map((link: any) => (
+                            <TableRow key={link.id}>
+                              <TableCell className="font-medium">{link.email}</TableCell>
+                              <TableCell><StatusBadge status={link.status} /></TableCell>
+                              <TableCell>{formatDate(link.expiresAt)}</TableCell>
+                              <TableCell className="text-right">
+                                {link.status !== "verified" ? (
+                                  <Button
+                                    variant="link"
+                                    className="text-primary hover:text-primary/80"
+                                    onClick={() => handleResend(link.email)}
+                                    disabled={resendMutation.isPending}
+                                  >
+                                    {resendMutation.isPending ? "Sending..." : "Resend"}
+                                  </Button>
+                                ) : (
+                                  <span className="text-gray-400">
+                                    <MailCheck className="h-4 w-4 inline mr-1" />
+                                    Verified
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
+        ) : (
+          // List View
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-6">
-                    No verification links found
-                  </TableCell>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Generated Date</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead>Verification Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                filteredLinks.map((link) => (
-                  <TableRow key={link.id}>
-                    <TableCell className="font-medium">{link.email}</TableCell>
-                    <TableCell><StatusBadge status={link.status} /></TableCell>
-                    <TableCell>{formatDate(link.createdAt)}</TableCell>
-                    <TableCell>{formatDate(link.expiresAt)}</TableCell>
-                    <TableCell>{formatDate(link.verifiedAt)}</TableCell>
-                    <TableCell className="text-right">
-                      {link.status !== "verified" ? (
-                        <Button
-                          variant="link"
-                          className="text-primary hover:text-primary/80"
-                          onClick={() => handleResend(link.email)}
-                          disabled={resendMutation.isPending}
-                        >
-                          {resendMutation.isPending ? "Sending..." : "Resend"}
-                        </Button>
-                      ) : (
-                        <span className="text-gray-400">Verified</span>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {filteredLinks.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6">
+                      <div className="flex flex-col items-center space-y-3 py-6 text-gray-500">
+                        <Inbox className="h-10 w-10" />
+                        <p>No verification links found</p>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  filteredLinks.map((link) => (
+                    <TableRow key={link.id}>
+                      <TableCell className="font-medium">{link.email}</TableCell>
+                      <TableCell><StatusBadge status={link.status} /></TableCell>
+                      <TableCell>{formatDate(link.createdAt)}</TableCell>
+                      <TableCell>{formatDate(link.expiresAt)}</TableCell>
+                      <TableCell>{formatDate(link.verifiedAt)}</TableCell>
+                      <TableCell className="text-right">
+                        {link.status !== "verified" ? (
+                          <Button
+                            variant="link"
+                            className="text-primary hover:text-primary/80"
+                            onClick={() => handleResend(link.email)}
+                            disabled={resendMutation.isPending}
+                          >
+                            {resendMutation.isPending ? "Sending..." : "Resend"}
+                          </Button>
+                        ) : (
+                          <span className="text-gray-400">Verified</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
-        {/* Pagination - Simplified version */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        {/* Pagination & Status */}
+        <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredLinks.length}</span> of <span className="font-medium">{filteredLinks.length}</span> results
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {viewMode === 'list' ? (
+                  <>
+                    Showing <span className="font-medium">{filteredLinks.length}</span> of <span className="font-medium">{filteredLinks.length}</span> results
+                  </>
+                ) : (
+                  <>
+                    Showing <span className="font-medium">{(data as any[]).length}</span> sessions
+                  </>
+                )}
               </p>
             </div>
+            {clearCacheMutation.isPending && (
+              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Clearing cache...</span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
