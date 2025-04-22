@@ -181,8 +181,19 @@ export class MemStorage implements IStorage {
     return this.settingsData;
   }
   
-  // Helper method to generate verification codes
-  generateVerificationCode(): string {
+  // Helper method to generate verification codes with enhanced security
+  async generateVerificationCode(): Promise<string> {
+    const settings = await this.getSettings();
+    if (settings && settings.securityLevel > 1) {
+      // Use advanced encryption if security level is greater than 1
+      try {
+        return generateSecureCode(settings);
+      } catch (error) {
+        console.warn("Failed to generate secure code for MemStorage, falling back to simple code", error);
+      }
+    }
+    
+    // Fallback to simple code generation
     return crypto.randomBytes(16).toString('hex');
   }
 }
@@ -329,8 +340,19 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  // Helper method to generate verification codes
-  generateVerificationCode(): string {
+  // Helper method to generate verification codes with enhanced security
+  async generateVerificationCode(): Promise<string> {
+    const settings = await this.getSettings();
+    if (settings && settings.securityLevel > 1) {
+      // Use advanced encryption if security level is greater than 1
+      try {
+        return generateSecureCode(settings);
+      } catch (error) {
+        console.warn("Failed to generate secure code for DatabaseStorage, falling back to simple code", error);
+      }
+    }
+    
+    // Fallback to simple code generation
     return crypto.randomBytes(16).toString('hex');
   }
 }

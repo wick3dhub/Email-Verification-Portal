@@ -10,7 +10,7 @@ import {
   type InsertSetting
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import crypto from 'crypto';
 import { generateSecureCode } from './encryption';
 import { IStorage } from './storage';
@@ -103,13 +103,14 @@ export class SecureStorage implements IStorage {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
       
-      // Convert to ISO string for date comparison
-      const cutoffDateStr = cutoffDate.toISOString();
-      
       const result = await db.delete(verificationLinks)
         .where(
-          // Use lt function from drizzle for "less than" operation
-          eq(verificationLinks.status, 'pending')
+          and(
+            eq(verificationLinks.status, 'pending'),
+            // Use SQL function to compare dates - convert the string dates to Date objects
+            // This works with ISO format dates stored in the database
+            sql`${verificationLinks.createdAt} < ${cutoffDate.toISOString()}`
+          )
         )
         .returning({ id: verificationLinks.id });
         

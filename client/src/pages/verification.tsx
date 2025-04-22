@@ -69,18 +69,40 @@ export default function Verification() {
       const errMessage = error instanceof Error ? error.message : "Verification failed";
       setErrorMessage(errMessage);
     } else if (data) {
-      // Check if bot protection is required
-      if (data.botProtectionRequired) {
-        setVerificationState('bot-check');
-        setSettings(data.settings);
-        setUserEmail(data.email || "");
+      // Define a type guard to check for the expected response format
+      const isVerificationResponse = (obj: any): obj is { 
+        botProtectionRequired: boolean; 
+        settings: Settings; 
+        email: string;
+        success: boolean; 
+      } => {
+        return obj && typeof obj === 'object' && 
+          'botProtectionRequired' in obj && 
+          'settings' in obj && 
+          'email' in obj &&
+          'success' in obj;
+      };
+      
+      // Ensure the response has the expected format
+      if (isVerificationResponse(data)) {
+        // Check if bot protection is required
+        if (data.botProtectionRequired) {
+          setVerificationState('bot-check');
+          setSettings(data.settings);
+          setUserEmail(data.email || "");
+        } else {
+          setVerificationState('success');
+          setSettings(data.settings);
+          setUserEmail(data.email || "");
+          
+          // Handle redirection
+          handleRedirect(data);
+        }
       } else {
-        setVerificationState('success');
-        setSettings(data.settings);
-        setUserEmail(data.email || "");
-        
-        // Handle redirection
-        handleRedirect(data);
+        // Handle unexpected response format
+        setVerificationState('error');
+        setErrorMessage("Invalid verification response from server");
+        console.error("Unexpected verification response format:", data);
       }
     }
   }, [data, isLoading, error]);
