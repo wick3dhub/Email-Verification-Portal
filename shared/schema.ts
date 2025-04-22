@@ -26,6 +26,7 @@ export const verificationLinks = pgTable("verification_links", {
 export const insertVerificationLinkSchema = createInsertSchema(verificationLinks).pick({
   email: true,
   code: true,
+  status: true,
   expiresAt: true,
 });
 
@@ -92,6 +93,7 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   securityLevel: true,
   useWildcards: true,
   encryptionSalt: true,
+  allowLinkRenewal: true,
   // Domain settings
   useCustomDomain: true,
   customDomain: true,

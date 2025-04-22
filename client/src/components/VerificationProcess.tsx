@@ -135,9 +135,67 @@ export default function VerificationProcess({
               <p className="mt-2 text-center text-sm text-gray-600">
                 {errorMessage}
               </p>
-              <p className="mt-3 text-center text-sm text-gray-600">
-                Please contact support for assistance.
-              </p>
+              
+              {/* Show renewal button only if settings allow it */}
+              {settings?.allowLinkRenewal && onRenewRequest && renewalState === 'idle' && (
+                <div className="mt-6">
+                  <p className="mb-4 text-sm text-gray-700">
+                    Would you like to request a new verification link?
+                  </p>
+                  <Button 
+                    onClick={async () => {
+                      setRenewalState('pending');
+                      try {
+                        const success = await onRenewRequest();
+                        setRenewalState(success ? 'success' : 'error');
+                      } catch (error) {
+                        setRenewalState('error');
+                      }
+                    }}
+                    className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                  >
+                    Request New Link
+                  </Button>
+                </div>
+              )}
+
+              {/* Show pending state while renewal is processing */}
+              {renewalState === 'pending' && (
+                <div className="mt-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-3 text-center text-sm text-gray-600">
+                    Processing your request...
+                  </p>
+                </div>
+              )}
+
+              {/* Show success message after renewal */}
+              {renewalState === 'success' && (
+                <div className="mt-6">
+                  <div className="mx-auto flex items-center justify-center h-8 w-8 rounded-full bg-green-100">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  </div>
+                  <p className="mt-3 text-center text-sm text-green-600 font-medium">
+                    Your request has been received. A new verification link will be sent to your email soon.
+                  </p>
+                </div>
+              )}
+
+              {/* Show error message if renewal fails */}
+              {renewalState === 'error' && (
+                <div className="mt-6">
+                  <p className="text-center text-sm text-red-600">
+                    Failed to process your request. Please try again later or contact support.
+                  </p>
+                </div>
+              )}
+
+              {/* Show contact support message if renewals are not allowed */}
+              {(!settings?.allowLinkRenewal || !onRenewRequest) && renewalState === 'idle' && (
+                <p className="mt-3 text-center text-sm text-gray-600">
+                  Please contact support for assistance.
+                </p>
+              )}
             </div>
           )}
         </CardContent>

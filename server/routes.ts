@@ -254,6 +254,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Resend verification for an email
+  // Endpoint for handling verification link renewal requests
+  app.post("/api/verification/renew", async (req: Request, res: Response) => {
+    try {
+      // Extract data from request
+      const { code, email } = req.body;
+      
+      if (!code || !email) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Missing required fields: code and email are required" 
+        });
+      }
+      
+      // Get settings to check if link renewal is enabled
+      const settings = await storage.getSettings();
+      if (!settings || !settings.allowLinkRenewal) {
+        return res.status(403).json({ 
+          success: false, 
+          message: "Link renewal is not enabled by the administrator" 
+        });
+      }
+      
+      // Get original verification link
+      const verificationLink = await storage.getVerificationLinkByCode(code);
+      if (!verificationLink) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Verification link not found" 
+        });
+      }
+      
+      // Check if the email matches
+      if (verificationLink.email !== email) {
+        return res.status(403).json({ 
+          success: false, 
+          message: "Email does not match the verification link" 
+        });
+      }
+      
+      // Check if the link is already verified (prevent renewals of already verified links)
+      if (verificationLink.status === 'verified') {
+        return res.status(400).json({ 
+          success: false, 
+          message: "This link has already been verified and cannot be renewed" 
+        });
+      }
+      
+      // Create a new verification link with the same email
+      const domain = await getVerificationDomain(req, 'default');
+      const newLink = await storage.createVerificationLink({
+        email: email,
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      });
+      
+      // Generate the full verification URL with the domain
+      const verificationUrl = `${domain}/verify/${newLink.code}`;
+      
+      // Return success response
+      res.status(200).json({ 
+        success: true, 
+        message: "Verification link renewed successfully",
+        renewedLinkId: newLink.id
+      });
+      
+    } catch (error) {
+      console.error("Error renewing verification link:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to renew verification link due to server error" 
+      });
+    }
+  });
+
   app.post("/api/verification/resend", async (req: Request, res: Response) => {
     try {
       const { email, useCustomTemplate = false, domain: domainOption = 'default' } = req.body;

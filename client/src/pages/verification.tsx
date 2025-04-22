@@ -20,6 +20,7 @@ export default function Verification() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [userEmail, setUserEmail] = useState<string>("");
+  const [verificationError, setVerificationError] = useState<any>(null);
   
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [`/api/verification/verify/${verificationCode}`],
@@ -27,6 +28,35 @@ export default function Verification() {
     staleTime: 0,
   });
   
+  // Function to handle renewal request
+  const handleRenewalRequest = async (): Promise<boolean> => {
+    if (!verificationCode || !userEmail) {
+      console.error("Cannot request renewal: missing code or email");
+      return false;
+    }
+
+    try {
+      const response = await apiRequest(
+        "POST", 
+        "/api/verification/renew", 
+        { 
+          code: verificationCode,
+          email: userEmail 
+        }
+      );
+      
+      if (response.ok) {
+        return true;
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to renew verification link");
+      }
+    } catch (err) {
+      console.error("Link renewal error:", err);
+      return false;
+    }
+  };
+
   // Function to handle bot protection check completion
   const handleBotCheckComplete = async () => {
     try {
@@ -142,6 +172,13 @@ export default function Verification() {
     }
   }, [data, isLoading, error]);
   
+  useEffect(() => {
+    // Store error information for renewal process when verification fails
+    if (error) {
+      setVerificationError(error);
+    }
+  }, [error]);
+
   return (
     <VerificationProcess 
       state={verificationState} 
@@ -149,6 +186,7 @@ export default function Verification() {
       settings={settings}
       email={userEmail}
       onBotCheckComplete={handleBotCheckComplete}
+      onRenewRequest={handleRenewalRequest}
     />
   );
 }
