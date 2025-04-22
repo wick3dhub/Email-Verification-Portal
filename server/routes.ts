@@ -9,6 +9,13 @@ import multer from "multer";
 import os from "os";
 import type { Setting } from "@shared/schema";
 
+// Define interface for domain objects
+interface DomainInfo {
+  domain: string;
+  cnameTarget: string;
+  verified: boolean;
+}
+
 // Helper function to determine the appropriate domain for verification links
 async function getVerificationDomain(req: Request, domainOption: string = 'default'): Promise<string> {
   try {
@@ -587,7 +594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      let additionalDomains: string[] = [];
+      let additionalDomains: (string | DomainInfo)[] = [];
       
       // Parse existing additional domains
       try {
@@ -611,7 +618,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Check if domain already exists
-        if (additionalDomains.includes(domain)) {
+        const exists = additionalDomains.some(d => {
+          if (typeof d === 'string') {
+            return d === domain;
+          } else {
+            return d.domain === domain;
+          }
+        });
+        
+        if (exists) {
           return res.status(400).json({
             success: false,
             message: "Domain already exists in the additional domains list"
@@ -621,12 +636,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Generate a unique CNAME target for this domain
         const cnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
         
-        // Add the new domain with its CNAME target (store as object in JSON)
-        additionalDomains.push({
+        // Add the new domain with its CNAME target
+        const domainInfo: DomainInfo = {
           domain,
           cnameTarget,
           verified: false
-        });
+        };
+        
+        additionalDomains.push(domainInfo);
       } else if (action === 'remove') {
         // Remove the domain
         additionalDomains = additionalDomains.filter(d => {
@@ -691,7 +708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if this is the primary domain or an additional domain
       let isPrimaryDomain = false;
-      let additionalDomains: any[] = [];
+      let additionalDomains: (string | DomainInfo)[] = [];
       
       if (settings.customDomain === domain) {
         isPrimaryDomain = true;
@@ -743,14 +760,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update the domain verification status
         if (typeof additionalDomains[domainIndex] === 'string') {
           // Convert old format to new format
-          additionalDomains[domainIndex] = {
-            domain: additionalDomains[domainIndex],
+          const domainString = additionalDomains[domainIndex] as string;
+          const domainInfo: DomainInfo = {
+            domain: domainString,
             cnameTarget: `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`,
             verified: true
           };
+          additionalDomains[domainIndex] = domainInfo;
         } else {
           // Update existing object
-          additionalDomains[domainIndex].verified = true;
+          const domainObj = additionalDomains[domainIndex] as DomainInfo;
+          domainObj.verified = true;
         }
         
         // Save updated domains
