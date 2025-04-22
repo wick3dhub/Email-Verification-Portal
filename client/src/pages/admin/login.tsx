@@ -44,15 +44,15 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gray-50">
-      <Card className="max-w-md w-full">
-        <CardContent className="pt-6 pb-6">
-          <div className="text-center mb-6">
-            <h2 className="text-3xl font-extrabold text-gray-900">
-              Admin Login
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-slate-900 to-slate-800">
+      <Card className="max-w-md w-full border-2 border-slate-200/20 shadow-xl">
+        <CardContent className="pt-8 pb-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-extrabold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-transparent bg-clip-text">
+              Wick3d Link Portal
             </h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Sign in to access the verification portal
+            <p className="mt-3 text-sm text-slate-500">
+              Sign in to access the verification dashboard
             </p>
           </div>
           
@@ -63,11 +63,12 @@ export default function Login() {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email address</FormLabel>
+                    <FormLabel className="text-slate-300">Email address</FormLabel>
                     <FormControl>
                       <Input 
                         placeholder="admin@example.com" 
-                        type="email" 
+                        type="email"
+                        className="bg-slate-50/5 border-slate-200/20 focus-visible:ring-purple-500"
                         {...field} 
                       />
                     </FormControl>
@@ -81,11 +82,12 @@ export default function Login() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel className="text-slate-300">Password</FormLabel>
                     <FormControl>
                       <Input 
                         placeholder="Enter your password" 
-                        type="password" 
+                        type="password"
+                        className="bg-slate-50/5 border-slate-200/20 focus-visible:ring-purple-500"
                         {...field} 
                       />
                     </FormControl>
@@ -96,7 +98,7 @@ export default function Login() {
               
               <Button 
                 type="submit" 
-                className="w-full mt-6" 
+                className="w-full mt-8 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:from-pink-600 hover:via-purple-600 hover:to-indigo-600 transition-all duration-300" 
                 disabled={isLoading}
               >
                 {isLoading ? "Signing in..." : "Sign in"}

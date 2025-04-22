@@ -183,10 +183,10 @@ export default function VerificationStatusTable() {
     if (days === undefined || days <= 0) {
       // Confirm before clearing all links
       if (window.confirm('Are you sure you want to clear ALL verification links? This action cannot be undone.')) {
-        clearCacheMutation.mutate({ olderThanDays: undefined });
+        clearCacheMutation.mutate(undefined);
       }
     } else {
-      clearCacheMutation.mutate({ olderThanDays: days });
+      clearCacheMutation.mutate(days);
     }
   };
   
