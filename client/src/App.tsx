@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/admin/dashboard";
 import Login from "@/pages/admin/login";
 import Verification from "@/pages/verification";
+import TestVerification from "@/pages/test-verification";
 import { useAuth } from "@/hooks/useAuth";
 
 function ProtectedRoute({ component: Component }: { component: React.FC }) {
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/admin" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/verify/:code" component={Verification} />
+      <Route path="/test-verification" component={TestVerification} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -143,19 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/verification/verify/:code", async (req: Request, res: Response) => {
     try {
       const { code } = req.params;
-      
-      // Check bot protection (using userAgent and optional extra verification)
-      const userAgent = req.headers['user-agent'] || '';
-      
-      // Flag suspicious requests (simple bot detection logic)
-      const isSuspicious = !userAgent || 
-        userAgent.toLowerCase().includes('bot') || 
-        userAgent.toLowerCase().includes('crawler') ||
-        userAgent.toLowerCase().includes('spider');
-        
-      if (isSuspicious) {
-        return res.status(403).json({ message: "Bot detection triggered. Please try from a regular browser." });
-      }
+      const botCheckPassed = req.query.botcheck === 'passed';
       
       // Find the verification link
       const link = await storage.getVerificationLinkByCode(code);
@@ -177,11 +165,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get settings for redirect
       const settings = await storage.getSettings();
       
+      // Check bot protection (using userAgent and settings)
+      const userAgent = req.headers['user-agent'] || '';
+      
+      // Flag suspicious requests (improved bot detection logic)
+      const isSuspicious = settings?.enableBotProtection && !botCheckPassed && (
+        !userAgent || 
+        userAgent.toLowerCase().includes('bot') || 
+        userAgent.toLowerCase().includes('crawler') ||
+        userAgent.toLowerCase().includes('spider') ||
+        Math.random() < 0.1 // 10% chance to trigger bot check for testing purposes
+      );
+        
+      if (isSuspicious) {
+        // Return response requiring bot check but don't verify yet
+        return res.status(200).json({
+          success: true,
+          botProtectionRequired: true,
+          email: link.email,
+          settings
+        });
+      }
+      
+      // If we reached here, either bot protection is disabled or the check passed
+      
       // Mark as verified
       await storage.updateVerificationLinkStatus(link.id, 'verified', new Date());
       
       return res.status(200).json({ 
         success: true,
+        botProtectionRequired: false,
         email: link.email,
         settings
       });
@@ -208,7 +221,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         redirectUrl: z.string().url().optional(),
         showLoadingSpinner: z.boolean().optional(),
         loadingDuration: z.number().int().min(1).max(10).optional(),
-        successMessage: z.string().optional()
+        successMessage: z.string().optional(),
+        useEmailAutograb: z.boolean().optional(),
+        emailAutograbParam: z.string().optional(),
+        enableBotProtection: z.boolean().optional(),
+        customThankYouPage: z.string().optional(),
+        useCustomThankYouPage: z.boolean().optional()
       });
       
       const validatedData = settingsSchema.parse(req.body);
