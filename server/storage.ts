@@ -70,7 +70,16 @@ export class MemStorage implements IStorage {
       useCustomThankYouPage: false,
       securityLevel: 1,
       useWildcards: false,
-      encryptionSalt: "default-salt-change-me"
+      encryptionSalt: "default-salt-change-me",
+      // Custom message settings
+      emailSubject: "Please verify your email address",
+      emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
+      smtpServer: "localhost",
+      smtpPort: 25,
+      smtpUser: "",
+      smtpPassword: "",
+      senderEmail: "no-reply@wick3d-links.com",
+      senderName: "Wick3d Link Portal"
     };
   }
 
@@ -157,7 +166,16 @@ export class MemStorage implements IStorage {
         useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false,
         securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
         useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
-        encryptionSalt: data.encryptionSalt || "default-salt-change-me"
+        encryptionSalt: data.encryptionSalt || "default-salt-change-me",
+        // Custom email settings
+        emailSubject: data.emailSubject || "Please verify your email address",
+        emailTemplate: data.emailTemplate || "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
+        smtpServer: data.smtpServer || "localhost",
+        smtpPort: data.smtpPort || 25,
+        smtpUser: data.smtpUser || "",
+        smtpPassword: data.smtpPassword || "",
+        senderEmail: data.senderEmail || "no-reply@wick3d-links.com",
+        senderName: data.senderName || "Wick3d Link Portal"
       };
     } else {
       // Update existing settings
@@ -174,7 +192,16 @@ export class MemStorage implements IStorage {
         useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : this.settingsData.useCustomThankYouPage,
         securityLevel: data.securityLevel !== undefined ? data.securityLevel : this.settingsData.securityLevel,
         useWildcards: data.useWildcards !== undefined ? data.useWildcards : this.settingsData.useWildcards,
-        encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : this.settingsData.encryptionSalt
+        encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : this.settingsData.encryptionSalt,
+        // Email settings
+        emailSubject: data.emailSubject !== undefined ? data.emailSubject : this.settingsData.emailSubject,
+        emailTemplate: data.emailTemplate !== undefined ? data.emailTemplate : this.settingsData.emailTemplate,
+        smtpServer: data.smtpServer !== undefined ? data.smtpServer : this.settingsData.smtpServer,
+        smtpPort: data.smtpPort !== undefined ? data.smtpPort : this.settingsData.smtpPort,
+        smtpUser: data.smtpUser !== undefined ? data.smtpUser : this.settingsData.smtpUser,
+        smtpPassword: data.smtpPassword !== undefined ? data.smtpPassword : this.settingsData.smtpPassword,
+        senderEmail: data.senderEmail !== undefined ? data.senderEmail : this.settingsData.senderEmail,
+        senderName: data.senderName !== undefined ? data.senderName : this.settingsData.senderName
       };
     }
     
@@ -284,7 +311,16 @@ export class DatabaseStorage implements IStorage {
         useCustomThankYouPage: false,
         securityLevel: 1,
         useWildcards: false,
-        encryptionSalt: "default-salt-change-me"
+        encryptionSalt: "default-salt-change-me",
+        // Custom message settings
+        emailSubject: "Please verify your email address",
+        emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
+        smtpServer: "localhost",
+        smtpPort: 25,
+        smtpUser: "",
+        smtpPassword: "",
+        senderEmail: "no-reply@wick3d-links.com",
+        senderName: "Wick3d Link Portal"
       });
     }
     
@@ -311,7 +347,16 @@ export class DatabaseStorage implements IStorage {
           useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false,
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
-          encryptionSalt: data.encryptionSalt || "default-salt-change-me"
+          encryptionSalt: data.encryptionSalt || "default-salt-change-me",
+          // Custom message settings
+          emailSubject: data.emailSubject || "Please verify your email address",
+          emailTemplate: data.emailTemplate || "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
+          smtpServer: data.smtpServer || "localhost",
+          smtpPort: data.smtpPort || 25,
+          smtpUser: data.smtpUser || "",
+          smtpPassword: data.smtpPassword || "",
+          senderEmail: data.senderEmail || "no-reply@wick3d-links.com",
+          senderName: data.senderName || "Wick3d Link Portal"
         })
         .returning();
       return setting;
