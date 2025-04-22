@@ -67,15 +67,15 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   securityLevel: true,
   useWildcards: true,
   encryptionSalt: true,
-  // Custom message settings for resending verification emails
+  // Email template settings
   emailSubject: true,
   emailTemplate: true,
+  senderEmail: true,
+  senderName: true,
   smtpServer: true,
   smtpPort: true,
   smtpUser: true,
   smtpPassword: true,
-  senderEmail: true,
-  senderName: true,
 });
 
 export type User = typeof users.$inferSelect;

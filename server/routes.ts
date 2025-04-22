@@ -311,7 +311,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         useCustomThankYouPage: z.boolean().optional(),
         securityLevel: z.number().int().min(1).max(5).optional(),
         useWildcards: z.boolean().optional(),
-        encryptionSalt: z.string().optional()
+        encryptionSalt: z.string().optional(),
+        // Email template settings
+        emailSubject: z.string().optional(),
+        emailTemplate: z.string().optional(),
+        senderEmail: z.string().email().optional(),
+        senderName: z.string().optional(),
+        smtpServer: z.string().optional(),
+        smtpPort: z.number().int().min(1).max(65535).optional(),
+        smtpUser: z.string().optional(),
+        smtpPassword: z.string().optional()
       });
       
       const validatedData = settingsSchema.parse(req.body);
