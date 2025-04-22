@@ -51,6 +51,11 @@ export interface Settings {
   useTelegramNotifications: boolean;
   telegramBotToken: string;
   telegramChatId: string;
+  // Rate limiting settings
+  enableRateLimiting: boolean;
+  rateLimitWindow: number;
+  rateLimitMaxRequests: number;
+  rateLimitBlockDuration: number;
 }
 
 export interface AuthUser {

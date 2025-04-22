@@ -10,8 +10,20 @@ const blockedIPs = new Map<string, number>();
  * This advanced rate limiter:
  * 1. Gets settings from the database to apply dynamic rate limiting
  * 2. Tracks blocked IPs for longer durations
- * 3. Applies different limits to different endpoints
+ * 3. Applies different limits to different endpoints based on sensitivity
  * 4. Provides detailed information about the rate limit in headers
+ * 5. Has configurable window time, max requests, and block duration
+ * 
+ * Rate limiting configuration:
+ * - enableRateLimiting: Boolean to enable/disable rate limiting
+ * - rateLimitWindow: Time window in minutes for rate limiting (1-60)
+ * - rateLimitMaxRequests: Maximum number of requests allowed in the window (10-1000)
+ * - rateLimitBlockDuration: How long to block IPs after exceeding limits, in minutes (5-1440)
+ * 
+ * Special route handling:
+ * - Authentication routes (/api/auth/*): Limited to 5-10% of normal limits
+ * - Verification routes (/api/verification/*): Limited to 20-33% of normal limits
+ * - General API routes: Use the full configured limit
  */
 export async function createRateLimiter(path: string = 'default') {
   // Get settings from the database
@@ -96,8 +108,11 @@ export async function createRateLimiter(path: string = 'default') {
 }
 
 /**
- * Creates separate rate limiters for different routes
- * @returns An object containing various rate limiter middlewares
+ * Creates separate rate limiters for different routes with appropriate limits
+ * @returns An object containing various rate limiter middlewares:
+ *   - general: Default rate limiter for all API routes
+ *   - auth: Stricter rate limiter for authentication routes (login/register)
+ *   - verification: Moderate rate limiter for verification endpoints
  */
 export async function createRateLimiters() {
   return {
