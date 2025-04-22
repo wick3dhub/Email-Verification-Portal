@@ -300,66 +300,68 @@ export default function EmailEntryForm() {
             </TabsContent>
             
             <TabsContent value="upload" className="space-y-6">
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="expireDays"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Expire Links After</FormLabel>
-                      <FormControl>
-                        <div className="flex rounded-md">
-                          <Input
-                            type="number"
-                            min={1}
-                            className="rounded-r-none"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                          />
-                          <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-input bg-muted text-muted-foreground text-sm">
-                            Days
-                          </span>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition cursor-pointer" onClick={handleChooseFile}>
-                  <FileUp className="h-10 w-10 mb-3 text-gray-400" />
-                  
-                  <div className="flex flex-col items-center justify-center">
-                    <p className="text-sm font-medium text-gray-700">
-                      {uploadFileName ? uploadFileName : "Click to upload TXT file"}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      TXT file with one email per line
-                    </p>
-                  </div>
-                  
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".txt"
-                    className="hidden"
-                    onChange={handleFileChange}
-                    disabled={fileUploadMutation.isPending}
+              <Form {...form}>
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="expireDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Expire Links After</FormLabel>
+                        <FormControl>
+                          <div className="flex rounded-md">
+                            <Input
+                              type="number"
+                              min={1}
+                              className="rounded-r-none"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            />
+                            <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-input bg-muted text-muted-foreground text-sm">
+                              Days
+                            </span>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                
-                {uploadProgress !== null && (
-                  <div className="w-full bg-gray-200 rounded-full overflow-hidden h-2">
-                    <div className="bg-primary h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                  
+                  <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition cursor-pointer" onClick={handleChooseFile}>
+                    <FileUp className="h-10 w-10 mb-3 text-gray-400" />
+                    
+                    <div className="flex flex-col items-center justify-center">
+                      <p className="text-sm font-medium text-gray-700">
+                        {uploadFileName ? uploadFileName : "Click to upload TXT file"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        TXT file with one email per line
+                      </p>
+                    </div>
+                    
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".txt"
+                      className="hidden"
+                      onChange={handleFileChange}
+                      disabled={fileUploadMutation.isPending}
+                    />
                   </div>
-                )}
-                
-                {uploadProgress !== null && (
-                  <p className="text-xs text-center text-gray-500">
-                    Uploading... {uploadProgress}%
-                  </p>
-                )}
-              </div>
+                  
+                  {uploadProgress !== null && (
+                    <div className="w-full bg-gray-200 rounded-full overflow-hidden h-2">
+                      <div className="bg-primary h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  )}
+                  
+                  {uploadProgress !== null && (
+                    <p className="text-xs text-center text-gray-500">
+                      Uploading... {uploadProgress}%
+                    </p>
+                  )}
+                </div>
+              </Form>
             </TabsContent>
           </Tabs>
         </CardContent>
