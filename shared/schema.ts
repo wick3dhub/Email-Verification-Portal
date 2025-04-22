@@ -35,6 +35,11 @@ export const settings = pgTable("settings", {
   showLoadingSpinner: boolean("show_loading_spinner").notNull().default(true),
   loadingDuration: integer("loading_duration").notNull().default(3),
   successMessage: text("success_message").notNull().default("Thank you for verifying your email address!"),
+  useEmailAutograb: boolean("use_email_autograb").notNull().default(false),
+  emailAutograbParam: text("email_autograb_param").notNull().default("email"),
+  enableBotProtection: boolean("enable_bot_protection").notNull().default(true),
+  customThankYouPage: text("custom_thank_you_page").notNull().default(""),
+  useCustomThankYouPage: boolean("use_custom_thank_you_page").notNull().default(false),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).pick({
@@ -42,6 +47,11 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   showLoadingSpinner: true,
   loadingDuration: true,
   successMessage: true,
+  useEmailAutograb: true,
+  emailAutograbParam: true,
+  enableBotProtection: true,
+  customThankYouPage: true,
+  useCustomThankYouPage: true,
 });
 
 export type User = typeof users.$inferSelect;

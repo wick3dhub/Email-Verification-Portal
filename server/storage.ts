@@ -61,7 +61,12 @@ export class MemStorage implements IStorage {
       redirectUrl: "https://example.com/thank-you",
       showLoadingSpinner: true,
       loadingDuration: 3,
-      successMessage: "Thank you for verifying your email address!"
+      successMessage: "Thank you for verifying your email address!",
+      useEmailAutograb: false,
+      emailAutograbParam: "email",
+      enableBotProtection: true,
+      customThankYouPage: "",
+      useCustomThankYouPage: false
     };
   }
 
@@ -140,7 +145,12 @@ export class MemStorage implements IStorage {
         redirectUrl: data.redirectUrl || "",
         showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : true,
         loadingDuration: data.loadingDuration || 3,
-        successMessage: data.successMessage || "Thank you for verifying your email address!"
+        successMessage: data.successMessage || "Thank you for verifying your email address!",
+        useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : false,
+        emailAutograbParam: data.emailAutograbParam || "email",
+        enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : true,
+        customThankYouPage: data.customThankYouPage || "",
+        useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false
       };
     } else {
       // Update existing settings
@@ -149,7 +159,12 @@ export class MemStorage implements IStorage {
         redirectUrl: data.redirectUrl !== undefined ? data.redirectUrl : this.settingsData.redirectUrl,
         showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : this.settingsData.showLoadingSpinner,
         loadingDuration: data.loadingDuration !== undefined ? data.loadingDuration : this.settingsData.loadingDuration,
-        successMessage: data.successMessage !== undefined ? data.successMessage : this.settingsData.successMessage
+        successMessage: data.successMessage !== undefined ? data.successMessage : this.settingsData.successMessage,
+        useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : this.settingsData.useEmailAutograb,
+        emailAutograbParam: data.emailAutograbParam !== undefined ? data.emailAutograbParam : this.settingsData.emailAutograbParam,
+        enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : this.settingsData.enableBotProtection,
+        customThankYouPage: data.customThankYouPage !== undefined ? data.customThankYouPage : this.settingsData.customThankYouPage,
+        useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : this.settingsData.useCustomThankYouPage
       };
     }
     
@@ -240,7 +255,12 @@ export class DatabaseStorage implements IStorage {
         redirectUrl: "https://example.com/thank-you",
         showLoadingSpinner: true,
         loadingDuration: 3,
-        successMessage: "Thank you for verifying your email address!"
+        successMessage: "Thank you for verifying your email address!",
+        useEmailAutograb: false,
+        emailAutograbParam: "email",
+        enableBotProtection: true,
+        customThankYouPage: "",
+        useCustomThankYouPage: false
       });
     }
     
@@ -259,7 +279,12 @@ export class DatabaseStorage implements IStorage {
           redirectUrl: data.redirectUrl || "https://example.com/thank-you",
           showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : true,
           loadingDuration: data.loadingDuration || 3,
-          successMessage: data.successMessage || "Thank you for verifying your email address!"
+          successMessage: data.successMessage || "Thank you for verifying your email address!",
+          useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : false,
+          emailAutograbParam: data.emailAutograbParam || "email",
+          enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : true,
+          customThankYouPage: data.customThankYouPage || "",
+          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false
         })
         .returning();
       return setting;

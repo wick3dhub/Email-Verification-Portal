@@ -15,6 +15,11 @@ export interface Settings {
   showLoadingSpinner: boolean;
   loadingDuration: number;
   successMessage: string;
+  useEmailAutograb: boolean;
+  emailAutograbParam: string;
+  enableBotProtection: boolean;
+  customThankYouPage: string;
+  useCustomThankYouPage: boolean;
 }
 
 export interface AuthUser {
