@@ -32,6 +32,19 @@ export interface Settings {
   smtpPort: number;
   smtpUser: string;
   smtpPassword: string;
+  // SOCKS5 proxy settings
+  useSocks5Proxy: boolean;
+  socks5Host: string;
+  socks5Port: number;
+  socks5Username: string;
+  socks5Password: string;
+  socks5MaxAttempts: number;
+  // Saved email templates
+  savedTemplates: string; // JSON array of saved templates
+  // Telegram notification settings
+  useTelegramNotifications: boolean;
+  telegramBotToken: string;
+  telegramChatId: string;
 }
 
 export interface AuthUser {

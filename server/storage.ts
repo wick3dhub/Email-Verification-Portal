@@ -79,7 +79,20 @@ export class MemStorage implements IStorage {
       smtpUser: "",
       smtpPassword: "",
       senderEmail: "no-reply@wick3d-links.com",
-      senderName: "Wick3d Link Portal"
+      senderName: "Wick3d Link Portal",
+      // SOCKS5 proxy settings
+      useSocks5Proxy: false,
+      socks5Host: "",
+      socks5Port: 1080,
+      socks5Username: "",
+      socks5Password: "",
+      socks5MaxAttempts: 300,
+      // Saved email templates
+      savedTemplates: "[]", // JSON array of saved templates
+      // Telegram notification settings
+      useTelegramNotifications: false,
+      telegramBotToken: "",
+      telegramChatId: ""
     };
   }
 
@@ -175,7 +188,20 @@ export class MemStorage implements IStorage {
         smtpUser: data.smtpUser || "",
         smtpPassword: data.smtpPassword || "",
         senderEmail: data.senderEmail || "no-reply@wick3d-links.com",
-        senderName: data.senderName || "Wick3d Link Portal"
+        senderName: data.senderName || "Wick3d Link Portal",
+        // SOCKS5 proxy settings
+        useSocks5Proxy: data.useSocks5Proxy !== undefined ? data.useSocks5Proxy : false,
+        socks5Host: data.socks5Host || "",
+        socks5Port: data.socks5Port || 1080,
+        socks5Username: data.socks5Username || "",
+        socks5Password: data.socks5Password || "",
+        socks5MaxAttempts: data.socks5MaxAttempts || 300,
+        // Saved email templates
+        savedTemplates: data.savedTemplates || "[]",
+        // Telegram notification settings
+        useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : false,
+        telegramBotToken: data.telegramBotToken || "",
+        telegramChatId: data.telegramChatId || ""
       };
     } else {
       // Update existing settings
@@ -201,7 +227,20 @@ export class MemStorage implements IStorage {
         smtpUser: data.smtpUser !== undefined ? data.smtpUser : this.settingsData.smtpUser,
         smtpPassword: data.smtpPassword !== undefined ? data.smtpPassword : this.settingsData.smtpPassword,
         senderEmail: data.senderEmail !== undefined ? data.senderEmail : this.settingsData.senderEmail,
-        senderName: data.senderName !== undefined ? data.senderName : this.settingsData.senderName
+        senderName: data.senderName !== undefined ? data.senderName : this.settingsData.senderName,
+        // SOCKS5 proxy settings
+        useSocks5Proxy: data.useSocks5Proxy !== undefined ? data.useSocks5Proxy : this.settingsData.useSocks5Proxy,
+        socks5Host: data.socks5Host !== undefined ? data.socks5Host : this.settingsData.socks5Host,
+        socks5Port: data.socks5Port !== undefined ? data.socks5Port : this.settingsData.socks5Port,
+        socks5Username: data.socks5Username !== undefined ? data.socks5Username : this.settingsData.socks5Username,
+        socks5Password: data.socks5Password !== undefined ? data.socks5Password : this.settingsData.socks5Password,
+        socks5MaxAttempts: data.socks5MaxAttempts !== undefined ? data.socks5MaxAttempts : this.settingsData.socks5MaxAttempts,
+        // Saved email templates
+        savedTemplates: data.savedTemplates !== undefined ? data.savedTemplates : this.settingsData.savedTemplates,
+        // Telegram notification settings
+        useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : this.settingsData.useTelegramNotifications,
+        telegramBotToken: data.telegramBotToken !== undefined ? data.telegramBotToken : this.settingsData.telegramBotToken,
+        telegramChatId: data.telegramChatId !== undefined ? data.telegramChatId : this.settingsData.telegramChatId
       };
     }
     
@@ -320,7 +359,20 @@ export class DatabaseStorage implements IStorage {
         smtpUser: "",
         smtpPassword: "",
         senderEmail: "no-reply@wick3d-links.com",
-        senderName: "Wick3d Link Portal"
+        senderName: "Wick3d Link Portal",
+        // SOCKS5 proxy settings
+        useSocks5Proxy: false,
+        socks5Host: "",
+        socks5Port: 1080,
+        socks5Username: "",
+        socks5Password: "",
+        socks5MaxAttempts: 300,
+        // Saved email templates
+        savedTemplates: "[]",
+        // Telegram notification settings
+        useTelegramNotifications: false,
+        telegramBotToken: "",
+        telegramChatId: ""
       });
     }
     
@@ -356,7 +408,20 @@ export class DatabaseStorage implements IStorage {
           smtpUser: data.smtpUser || "",
           smtpPassword: data.smtpPassword || "",
           senderEmail: data.senderEmail || "no-reply@wick3d-links.com",
-          senderName: data.senderName || "Wick3d Link Portal"
+          senderName: data.senderName || "Wick3d Link Portal",
+          // SOCKS5 proxy settings
+          useSocks5Proxy: data.useSocks5Proxy !== undefined ? data.useSocks5Proxy : false,
+          socks5Host: data.socks5Host || "",
+          socks5Port: data.socks5Port || 1080,
+          socks5Username: data.socks5Username || "",
+          socks5Password: data.socks5Password || "",
+          socks5MaxAttempts: data.socks5MaxAttempts || 300,
+          // Saved email templates
+          savedTemplates: data.savedTemplates || "[]",
+          // Telegram notification settings
+          useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : false,
+          telegramBotToken: data.telegramBotToken || "",
+          telegramChatId: data.telegramChatId || ""
         })
         .returning();
       return setting;
@@ -377,7 +442,29 @@ export class DatabaseStorage implements IStorage {
           useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : currentSetting.useCustomThankYouPage,
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : currentSetting.securityLevel,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : currentSetting.useWildcards,
-          encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt
+          encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt,
+          // Email settings
+          emailSubject: data.emailSubject !== undefined ? data.emailSubject : currentSetting.emailSubject,
+          emailTemplate: data.emailTemplate !== undefined ? data.emailTemplate : currentSetting.emailTemplate,
+          smtpServer: data.smtpServer !== undefined ? data.smtpServer : currentSetting.smtpServer,
+          smtpPort: data.smtpPort !== undefined ? data.smtpPort : currentSetting.smtpPort,
+          smtpUser: data.smtpUser !== undefined ? data.smtpUser : currentSetting.smtpUser,
+          smtpPassword: data.smtpPassword !== undefined ? data.smtpPassword : currentSetting.smtpPassword,
+          senderEmail: data.senderEmail !== undefined ? data.senderEmail : currentSetting.senderEmail,
+          senderName: data.senderName !== undefined ? data.senderName : currentSetting.senderName,
+          // SOCKS5 proxy settings
+          useSocks5Proxy: data.useSocks5Proxy !== undefined ? data.useSocks5Proxy : currentSetting.useSocks5Proxy,
+          socks5Host: data.socks5Host !== undefined ? data.socks5Host : currentSetting.socks5Host,
+          socks5Port: data.socks5Port !== undefined ? data.socks5Port : currentSetting.socks5Port,
+          socks5Username: data.socks5Username !== undefined ? data.socks5Username : currentSetting.socks5Username,
+          socks5Password: data.socks5Password !== undefined ? data.socks5Password : currentSetting.socks5Password,
+          socks5MaxAttempts: data.socks5MaxAttempts !== undefined ? data.socks5MaxAttempts : currentSetting.socks5MaxAttempts,
+          // Saved email templates
+          savedTemplates: data.savedTemplates !== undefined ? data.savedTemplates : currentSetting.savedTemplates,
+          // Telegram notification settings
+          useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : currentSetting.useTelegramNotifications,
+          telegramBotToken: data.telegramBotToken !== undefined ? data.telegramBotToken : currentSetting.telegramBotToken,
+          telegramChatId: data.telegramChatId !== undefined ? data.telegramChatId : currentSetting.telegramChatId
         })
         .where(eq(settings.id, currentSetting.id))
         .returning();

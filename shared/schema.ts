@@ -89,6 +89,19 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   smtpPort: true,
   smtpUser: true,
   smtpPassword: true,
+  // SOCKS5 proxy settings
+  useSocks5Proxy: true,
+  socks5Host: true,
+  socks5Port: true,
+  socks5Username: true,
+  socks5Password: true,
+  socks5MaxAttempts: true,
+  // Saved email templates
+  savedTemplates: true,
+  // Telegram notification settings
+  useTelegramNotifications: true,
+  telegramBotToken: true,
+  telegramChatId: true,
 });
 
 export type User = typeof users.$inferSelect;
