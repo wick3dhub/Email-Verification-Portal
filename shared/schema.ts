@@ -43,6 +43,11 @@ export const settings = pgTable("settings", {
   securityLevel: integer("security_level").notNull().default(1),
   useWildcards: boolean("use_wildcards").notNull().default(false),
   encryptionSalt: text("encryption_salt").notNull().default(""),
+  // Domain settings
+  useCustomDomain: boolean("use_custom_domain").notNull().default(false),
+  customDomain: text("custom_domain").notNull().default(""),
+  domainCnameTarget: text("domain_cname_target").notNull().default(""),
+  domainVerified: boolean("domain_verified").notNull().default(false),
   // Email template settings
   emailSubject: text("email_subject").notNull().default("Please verify your email address"),
   emailTemplate: text("email_template").notNull().default("Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal"),
@@ -80,6 +85,11 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   securityLevel: true,
   useWildcards: true,
   encryptionSalt: true,
+  // Domain settings
+  useCustomDomain: true,
+  customDomain: true,
+  domainCnameTarget: true,
+  domainVerified: true,
   // Email template settings
   emailSubject: true,
   emailTemplate: true,

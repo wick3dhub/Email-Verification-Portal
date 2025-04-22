@@ -68,6 +68,11 @@ export class MemStorage implements IStorage {
       enableBotProtection: true,
       customThankYouPage: "",
       useCustomThankYouPage: false,
+      // Domain settings
+      useCustomDomain: false,
+      customDomain: "",
+      domainCnameTarget: "",
+      domainVerified: false,
       securityLevel: 1,
       useWildcards: false,
       encryptionSalt: "default-salt-change-me",
@@ -180,6 +185,11 @@ export class MemStorage implements IStorage {
         securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
         useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
         encryptionSalt: data.encryptionSalt || "default-salt-change-me",
+        // Domain settings
+        useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : false,
+        customDomain: data.customDomain || "",
+        domainCnameTarget: data.domainCnameTarget || "",
+        domainVerified: data.domainVerified !== undefined ? data.domainVerified : false,
         // Custom email settings
         emailSubject: data.emailSubject || "Please verify your email address",
         emailTemplate: data.emailTemplate || "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -219,6 +229,11 @@ export class MemStorage implements IStorage {
         securityLevel: data.securityLevel !== undefined ? data.securityLevel : this.settingsData.securityLevel,
         useWildcards: data.useWildcards !== undefined ? data.useWildcards : this.settingsData.useWildcards,
         encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : this.settingsData.encryptionSalt,
+        // Domain settings
+        useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : this.settingsData.useCustomDomain,
+        customDomain: data.customDomain !== undefined ? data.customDomain : this.settingsData.customDomain,
+        domainCnameTarget: data.domainCnameTarget !== undefined ? data.domainCnameTarget : this.settingsData.domainCnameTarget,
+        domainVerified: data.domainVerified !== undefined ? data.domainVerified : this.settingsData.domainVerified,
         // Email settings
         emailSubject: data.emailSubject !== undefined ? data.emailSubject : this.settingsData.emailSubject,
         emailTemplate: data.emailTemplate !== undefined ? data.emailTemplate : this.settingsData.emailTemplate,
@@ -351,6 +366,11 @@ export class DatabaseStorage implements IStorage {
         securityLevel: 1,
         useWildcards: false,
         encryptionSalt: "default-salt-change-me",
+        // Domain settings
+        useCustomDomain: false,
+        customDomain: "",
+        domainCnameTarget: "",
+        domainVerified: false,
         // Custom message settings
         emailSubject: "Please verify your email address",
         emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -400,6 +420,11 @@ export class DatabaseStorage implements IStorage {
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
           encryptionSalt: data.encryptionSalt || "default-salt-change-me",
+          // Domain settings
+          useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : false,
+          customDomain: data.customDomain || "",
+          domainCnameTarget: data.domainCnameTarget || "",
+          domainVerified: data.domainVerified !== undefined ? data.domainVerified : false,
           // Custom message settings
           emailSubject: data.emailSubject || "Please verify your email address",
           emailTemplate: data.emailTemplate || "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -443,6 +468,11 @@ export class DatabaseStorage implements IStorage {
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : currentSetting.securityLevel,
           useWildcards: data.useWildcards !== undefined ? data.useWildcards : currentSetting.useWildcards,
           encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt,
+          // Domain settings
+          useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : currentSetting.useCustomDomain,
+          customDomain: data.customDomain !== undefined ? data.customDomain : currentSetting.customDomain,
+          domainCnameTarget: data.domainCnameTarget !== undefined ? data.domainCnameTarget : currentSetting.domainCnameTarget,
+          domainVerified: data.domainVerified !== undefined ? data.domainVerified : currentSetting.domainVerified,
           // Email settings
           emailSubject: data.emailSubject !== undefined ? data.emailSubject : currentSetting.emailSubject,
           emailTemplate: data.emailTemplate !== undefined ? data.emailTemplate : currentSetting.emailTemplate,
