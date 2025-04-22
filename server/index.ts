@@ -6,6 +6,7 @@ import { db } from "./db";
 import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
 import { createHash } from "crypto";
+import { createRateLimiters } from "./middleware/rateLimiter";
 
 const app = express();
 app.use(express.json());
@@ -98,6 +99,14 @@ app.use((req, res, next) => {
 (async () => {
   // Initialize admin account and settings before starting server
   await initializeAdminAccount();
+  
+  // Initialize rate limiters
+  const rateLimiters = await createRateLimiters();
+  
+  // Apply rate limiters to api routes
+  app.use('/api/auth', rateLimiters.auth);
+  app.use('/api/verification', rateLimiters.verification);
+  app.use('/api', rateLimiters.general);
   
   const server = await registerRoutes(app);
 

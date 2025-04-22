@@ -174,7 +174,12 @@ export class SecureStorage implements IStorage {
         securityLevel: 1,
         useWildcards: false,
         encryptionSalt: "default-salt-change-me",
-        additionalDomains: "[]"
+        additionalDomains: "[]",
+        // Rate limiting settings
+        enableRateLimiting: true,
+        rateLimitWindow: 15,
+        rateLimitMaxRequests: 100,
+        rateLimitBlockDuration: 30
       });
     }
     
