@@ -12,6 +12,7 @@ import {
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 import crypto from 'crypto';
+import { generateSecureCode } from './encryption';
 
 export interface IStorage {
   // User operations
@@ -31,7 +32,7 @@ export interface IStorage {
   updateSettings(data: Partial<InsertSetting>): Promise<Setting>;
   
   // Helper for generating verification codes
-  generateVerificationCode(): string;
+  generateVerificationCode(): Promise<string>;
 }
 
 export class MemStorage implements IStorage {
@@ -334,8 +335,10 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Initialize storage with database implementation
-export const storage = new DatabaseStorage();
+import { SecureStorage } from './secureStorage';
+
+// Initialize storage with enhanced secure database implementation
+export const storage = new SecureStorage();
 
 // Create default admin user if it doesn't exist
 (async () => {
