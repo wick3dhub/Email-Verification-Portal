@@ -24,6 +24,10 @@ const settingsSchema = z.object({
   enableBotProtection: z.boolean(),
   customThankYouPage: z.string(),
   useCustomThankYouPage: z.boolean(),
+  // Security settings
+  securityLevel: z.number().int().min(1).max(5),
+  useWildcards: z.boolean(),
+  encryptionSalt: z.string(),
   // Custom email template settings
   emailSubject: z.string().min(1, "Email subject cannot be empty"),
   emailTemplate: z.string().min(1, "Email template cannot be empty"),
@@ -33,6 +37,19 @@ const settingsSchema = z.object({
   smtpPort: z.number().int().min(1, "Port must be at least 1").max(65535, "Port must be at most 65535"),
   smtpUser: z.string().optional(),
   smtpPassword: z.string().optional(),
+  // SOCKS5 proxy settings
+  useSocks5Proxy: z.boolean(),
+  socks5Host: z.string().optional(),
+  socks5Port: z.number().int().min(1, "Port must be at least 1").max(65535, "Port must be at most 65535"),
+  socks5Username: z.string().optional(),
+  socks5Password: z.string().optional(),
+  socks5MaxAttempts: z.number().int().min(1).max(1000),
+  // Saved email templates
+  savedTemplates: z.string(),
+  // Telegram notification settings
+  useTelegramNotifications: z.boolean(),
+  telegramBotToken: z.string().optional(),
+  telegramChatId: z.string().optional(),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -59,6 +76,10 @@ export default function SettingsForm() {
       enableBotProtection: true,
       customThankYouPage: "",
       useCustomThankYouPage: false,
+      // Security settings
+      securityLevel: 1,
+      useWildcards: false,
+      encryptionSalt: "default-salt-change-me",
       // Email settings defaults
       emailSubject: "Please verify your email address",
       emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -68,6 +89,19 @@ export default function SettingsForm() {
       smtpPort: 25,
       smtpUser: "",
       smtpPassword: "",
+      // SOCKS5 proxy settings
+      useSocks5Proxy: false,
+      socks5Host: "",
+      socks5Port: 1080,
+      socks5Username: "",
+      socks5Password: "",
+      socks5MaxAttempts: 300,
+      // Saved email templates
+      savedTemplates: "[]",
+      // Telegram notification settings
+      useTelegramNotifications: false,
+      telegramBotToken: "",
+      telegramChatId: "",
     },
   });
 
@@ -84,6 +118,10 @@ export default function SettingsForm() {
         enableBotProtection: settings.enableBotProtection,
         customThankYouPage: settings.customThankYouPage,
         useCustomThankYouPage: settings.useCustomThankYouPage,
+        // Security settings
+        securityLevel: settings.securityLevel,
+        useWildcards: settings.useWildcards,
+        encryptionSalt: settings.encryptionSalt,
         // Email template settings
         emailSubject: settings.emailSubject,
         emailTemplate: settings.emailTemplate,
@@ -93,6 +131,19 @@ export default function SettingsForm() {
         smtpPort: settings.smtpPort,
         smtpUser: settings.smtpUser || '',
         smtpPassword: settings.smtpPassword || '',
+        // SOCKS5 proxy settings
+        useSocks5Proxy: settings.useSocks5Proxy,
+        socks5Host: settings.socks5Host || '',
+        socks5Port: settings.socks5Port,
+        socks5Username: settings.socks5Username || '',
+        socks5Password: settings.socks5Password || '',
+        socks5MaxAttempts: settings.socks5MaxAttempts,
+        // Saved email templates
+        savedTemplates: settings.savedTemplates,
+        // Telegram notification settings
+        useTelegramNotifications: settings.useTelegramNotifications,
+        telegramBotToken: settings.telegramBotToken || '',
+        telegramChatId: settings.telegramChatId || '',
       });
     }
   }, [settings, form]);
@@ -344,6 +395,84 @@ export default function SettingsForm() {
                 )}
               />
             )}
+
+            <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">Security Settings</h3>
+              <p className="mt-1 text-sm text-gray-500 mb-4">
+                Configure security options for verification links.
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="securityLevel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Security Level (1-5)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={5}
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Higher levels provide stronger security but slower generation.
+                    <ul className="list-disc pl-5 mt-2 space-y-1">
+                      <li>Level 1: Basic random hexadecimal string (fastest)</li>
+                      <li>Level 2: Basic + timestamp-based component</li>
+                      <li>Level 3: Level 2 + domain-specific signature</li>
+                      <li>Level 4: Level 3 + HMAC-based encryption</li>
+                      <li>Level 5: Level 4 + Double-layered encryption (slowest)</li>
+                    </ul>
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="useWildcards"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Add Wildcards to Links</FormLabel>
+                    <FormDescription>
+                      Insert random special characters to avoid pattern detection by security scanners
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="encryptionSalt"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Encryption Salt</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="default-salt-change-me"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Used for HMAC-based encryption in security levels 4 and 5.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
               <h3 className="text-base font-medium text-gray-900 mb-4">Email Template Settings</h3>
@@ -482,6 +611,193 @@ export default function SettingsForm() {
               />
             </div>
 
+            <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">SOCKS5 Proxy Settings</h3>
+              <p className="mt-1 text-sm text-gray-500 mb-4">
+                Configure SOCKS5 proxy for SMTP connections (useful for high-volume sending).
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="useSocks5Proxy"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Use SOCKS5 Proxy</FormLabel>
+                    <FormDescription>
+                      Route SMTP connections through a SOCKS5 proxy
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {form.watch('useSocks5Proxy') && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="socks5Host"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>SOCKS5 Proxy Host</FormLabel>
+                        <FormControl>
+                          <Input placeholder="proxy.example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="socks5Port"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>SOCKS5 Proxy Port</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="1080"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1080)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="socks5Username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>SOCKS5 Username (optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="username" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="socks5Password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>SOCKS5 Password (optional)</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="socks5MaxAttempts"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Maximum SOCKS5 Connection Attempts</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={1000}
+                          placeholder="300"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 300)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Maximum number of connection attempts before giving up (useful for unreliable proxies)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+
+            <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">Telegram Notification Settings</h3>
+              <p className="mt-1 text-sm text-gray-500 mb-4">
+                Get notifications via Telegram when verification links are clicked.
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="useTelegramNotifications"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Use Telegram Notifications</FormLabel>
+                    <FormDescription>
+                      Send notifications to a Telegram chat when links are clicked
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {form.watch('useTelegramNotifications') && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="telegramBotToken"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telegram Bot Token</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123456789:ABCdefGhIJKlmnOPQRstUVwxyZ" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Create a bot with BotFather to get a token
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="telegramChatId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telegram Chat ID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="-123456789" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Your chat ID or group ID where notifications will be sent
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+            
             <div className="flex justify-end">
               <Button
                 type="submit"
