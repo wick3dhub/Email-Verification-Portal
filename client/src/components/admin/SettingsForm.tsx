@@ -19,6 +19,11 @@ const settingsSchema = z.object({
   showLoadingSpinner: z.boolean(),
   loadingDuration: z.number().int().min(1, "Duration must be at least 1 second").max(10, "Duration must be at most 10 seconds"),
   successMessage: z.string().min(1, "Success message cannot be empty"),
+  useEmailAutograb: z.boolean(),
+  emailAutograbParam: z.string().min(1, "Parameter name cannot be empty"),
+  enableBotProtection: z.boolean(),
+  customThankYouPage: z.string(),
+  useCustomThankYouPage: z.boolean(),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -40,6 +45,11 @@ export default function SettingsForm() {
       showLoadingSpinner: true,
       loadingDuration: 3,
       successMessage: "Thank you for verifying your email address!",
+      useEmailAutograb: false,
+      emailAutograbParam: "email",
+      enableBotProtection: true,
+      customThankYouPage: "",
+      useCustomThankYouPage: false,
     },
   });
 
@@ -51,6 +61,11 @@ export default function SettingsForm() {
         showLoadingSpinner: settings.showLoadingSpinner,
         loadingDuration: settings.loadingDuration,
         successMessage: settings.successMessage,
+        useEmailAutograb: settings.useEmailAutograb,
+        emailAutograbParam: settings.emailAutograbParam,
+        enableBotProtection: settings.enableBotProtection,
+        customThankYouPage: settings.customThankYouPage,
+        useCustomThankYouPage: settings.useCustomThankYouPage,
       });
     }
   }, [settings, form]);
@@ -192,6 +207,116 @@ export default function SettingsForm() {
                 </FormItem>
               )}
             />
+
+            <div className="border-t border-gray-200 pt-6 mt-6 mb-6">
+              <h3 className="text-base font-medium text-gray-900 mb-4">Advanced Features</h3>
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="useEmailAutograb"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Enable Email Autograb</FormLabel>
+                    <FormDescription>
+                      Replace a parameter in the redirect URL with the user's email address
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {form.watch('useEmailAutograb') && (
+              <FormField
+                control={form.control}
+                name="emailAutograbParam"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Parameter Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="email" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Example: If parameter is "email", your redirect URL like "https://example.com?email=EMAIL_HERE" 
+                      will replace EMAIL_HERE with the user's actual email
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            
+            <FormField
+              control={form.control}
+              name="enableBotProtection"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Enable Bot Protection</FormLabel>
+                    <FormDescription>
+                      Show a simple challenge for verification links when suspicious traffic is detected
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="useCustomThankYouPage"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Use Custom Thank You Page</FormLabel>
+                    <FormDescription>
+                      Use custom HTML for the verification success page instead of the default
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {form.watch('useCustomThankYouPage') && (
+              <FormField
+                control={form.control}
+                name="customThankYouPage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Custom Thank You HTML</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="<h1>Thank you!</h1><p>Your email has been verified.</p>"
+                        className="min-h-[200px] font-mono"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Enter custom HTML for the thank you page. Use &#123;email&#125; to include the user's email.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             
             <div className="flex justify-end">
               <Button
