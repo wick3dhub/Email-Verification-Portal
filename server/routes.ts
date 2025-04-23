@@ -868,9 +868,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Start background verification process
       // This will check the domain periodically without blocking the user
       setTimeout(() => {
-        // Verify the domain without blocking, but do it after settings have been fully saved
+        console.log(`Starting background verification for ${domain} with target ${cnameTarget}`);
+        console.log(`Settings have been saved, primary domain: ${updatedSettings?.customDomain}`);
+        console.log(`Additional domains: ${updatedSettings?.additionalDomains}`);
+        
+        // Verify the domain without blocking, after settings have been fully saved
         verifyDomainInBackground(domain, cnameTarget);
-      }, 1000); // Increased delay to ensure settings are written to database
+      }, 2000); // Increased delay to ensure settings are written to database
       
       // Return success with CNAME information for admin to configure
       return res.status(200).json({
@@ -895,7 +899,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check domain verification status
   app.post("/api/domain/check", async (req: Request, res: Response) => {
     try {
-      const { domain } = req.body;
+      const { domain, recentlyAddedDomain, recentlyCnameTarget } = req.body;
+      
+      console.log(`Domain check request: domain=${domain}, recentlyAddedDomain=${recentlyAddedDomain}, recentlyCnameTarget=${recentlyCnameTarget}`);
       
       if (!domain) {
         return res.status(400).json({ 
@@ -914,10 +920,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      console.log(`Checking domain: ${domain}`);
+      console.log(`Current primary domain: "${settings.customDomain}"`);
+      
       // Determine whether this is the primary domain or an additional domain
       let isPrimaryDomain = settings.customDomain === domain;
       let cnameTarget = settings.domainCnameTarget;
       let domainInfo: any = null;
+      
+      console.log(`Is primary domain: ${isPrimaryDomain}`);
+      
+      // Special case: if the domain is being added for the first time, the DNS instructions window
+      // may still be open, but the domain might not be fully saved in settings yet
+      if (!isPrimaryDomain && domain === req.body.recentlyAddedDomain) {
+        console.log(`Special handling for recently added domain: ${domain}`);
+        isPrimaryDomain = true;
+        if (req.body.recentlyCnameTarget) {
+          cnameTarget = req.body.recentlyCnameTarget;
+        }
+      }
       
       // If not primary domain, look in additional domains
       if (!isPrimaryDomain) {

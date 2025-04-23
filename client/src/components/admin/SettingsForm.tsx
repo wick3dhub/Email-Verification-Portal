@@ -99,7 +99,12 @@ export default function SettingsForm() {
   // Function to check domain verification status
   const checkDomainVerification = async (domain: string) => {
     try {
-      const res = await apiRequest("POST", "/api/domain/check", { domain });
+      // Pass the domain along with the CNAME target and mark it as recently added
+      const res = await apiRequest("POST", "/api/domain/check", { 
+        domain,
+        recentlyAddedDomain: dnsInstructions.domain,
+        recentlyCnameTarget: dnsInstructions.cnameTarget
+      });
       const data = await res.json();
       
       if (data.success && data.verified) {
