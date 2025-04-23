@@ -9,6 +9,22 @@ import multer from "multer";
 import os from "os";
 import type { Setting } from "@shared/schema";
 
+// Define global types for the application
+declare global {
+  namespace NodeJS {
+    interface Global {
+      recentlyAddedDomain?: {
+        domain: string;
+        cnameTarget: string;
+        timestamp: number;
+      };
+    }
+  }
+}
+
+// Initialize the global domain tracking object
+global.recentlyAddedDomain = undefined;
+
 // Define interface for domain objects
 interface DomainInfo {
   domain: string;
