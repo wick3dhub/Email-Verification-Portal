@@ -22,75 +22,13 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
     const settings = await storage.getSettings();
     const defaultDomain = req.get('host') || 'localhost:5000';
     
-    // If custom domains are not enabled or the main domain is not verified, use default
+    // If custom domains are not enabled or the domain is not verified, use default
     if (!settings?.useCustomDomain || !settings.customDomain || !settings.domainVerified) {
       return defaultDomain;
     }
     
-    // Handle different domain selection options
-    switch(domainOption) {
-      case 'default':
-        // Use default domain (request host)
-        return defaultDomain;
-        
-      case 'random': {
-        // Create array of available domains (main + additional)
-        const domains = [settings.customDomain];
-        
-        // Add additional domains if available
-        if (settings.additionalDomains) {
-          try {
-            const additionalDomains = JSON.parse(settings.additionalDomains);
-            if (Array.isArray(additionalDomains) && additionalDomains.length > 0) {
-              // Parse domains from the array - handle both string and object formats
-              additionalDomains.forEach(domain => {
-                if (typeof domain === 'string') {
-                  domains.push(domain);
-                } else if (domain.domain && domain.verified) {
-                  // Only include verified domains
-                  domains.push(domain.domain);
-                }
-              });
-            }
-          } catch (err) {
-            console.error("Error parsing additional domains:", err);
-          }
-        }
-        
-        // Select random domain from available domains
-        const randomIndex = Math.floor(Math.random() * domains.length);
-        return domains[randomIndex];
-      }
-        
-      default:
-        // If a specific domain is provided, verify it's either the main domain or in additional domains
-        if (domainOption === settings.customDomain) {
-          return domainOption;
-        }
-        
-        // Check if the domain is in additional domains
-        if (settings.additionalDomains) {
-          try {
-            const additionalDomains = JSON.parse(settings.additionalDomains);
-            if (Array.isArray(additionalDomains)) {
-              // Check for the domain in the additional domains array
-              for (const domain of additionalDomains) {
-                if (
-                  (typeof domain === 'string' && domain === domainOption) || 
-                  (domain.domain && domain.domain === domainOption && domain.verified)
-                ) {
-                  return domainOption;
-                }
-              }
-            }
-          } catch (err) {
-            console.error("Error parsing additional domains:", err);
-          }
-        }
-        
-        // If domain wasn't found, fall back to main custom domain
-        return settings.customDomain;
-    }
+    // If custom domain is enabled and verified, use it
+    return settings.customDomain;
   } catch (error) {
     console.error("Error getting verification domain:", error);
     // Fallback to request host
@@ -636,119 +574,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Domain verification endpoint
-  // Add or remove additional domains
-  app.post("/api/domain/manage", async (req: Request, res: Response) => {
-    try {
-      const { action, domain } = req.body;
-      
-      if (!domain || !action) {
-        return res.status(400).json({
-          success: false,
-          message: "Domain and action are required"
-        });
-      }
-      
-      // Get existing settings
-      const settings = await storage.getSettings();
-      
-      if (!settings) {
-        return res.status(404).json({
-          success: false,
-          message: "Settings not found"
-        });
-      }
-      
-      let additionalDomains: (string | DomainInfo)[] = [];
-      
-      // Parse existing additional domains
-      try {
-        additionalDomains = JSON.parse(settings.additionalDomains || '[]');
-        if (!Array.isArray(additionalDomains)) {
-          additionalDomains = [];
-        }
-      } catch (err) {
-        console.error("Error parsing additional domains:", err);
-        additionalDomains = [];
-      }
-      
-      // Handle add/remove actions
-      if (action === 'add') {
-        // Validate domain format (simple validation)
-        if (!domain.match(/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/)) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid domain format"
-          });
-        }
-        
-        // Check if domain already exists
-        const exists = additionalDomains.some(d => {
-          if (typeof d === 'string') {
-            return d === domain;
-          } else {
-            return d.domain === domain;
-          }
-        });
-        
-        if (exists) {
-          return res.status(400).json({
-            success: false,
-            message: "Domain already exists in the additional domains list"
-          });
-        }
-        
-        // Generate a unique CNAME target for this domain
-        const cnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
-        
-        // Add the new domain with its CNAME target
-        const domainInfo: DomainInfo = {
-          domain,
-          cnameTarget,
-          verified: false
-        };
-        
-        additionalDomains.push(domainInfo);
-      } else if (action === 'remove') {
-        // Remove the domain
-        additionalDomains = additionalDomains.filter(d => {
-          // Handle both old string format and new object format
-          if (typeof d === 'string') {
-            return d !== domain;
-          } else {
-            return d.domain !== domain;
-          }
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid action. Expected 'add' or 'remove'"
-        });
-      }
-      
-      // Update settings
-      const updatedSettings = await storage.updateSettings({
-        additionalDomains: JSON.stringify(additionalDomains)
-      });
-      
-      return res.status(200).json({
-        success: true,
-        message: action === 'add' ? "Domain added successfully" : "Domain removed successfully",
-        domains: additionalDomains,
-        settings: updatedSettings
-      });
-    } catch (error) {
-      console.error("Error managing domains:", error);
-      return res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : "Failed to manage domains"
-      });
-    }
-  });
+
 
   app.post("/api/domain/verify", async (req: Request, res: Response) => {
     try {
-      const { domain, skipDnsCheck = false } = req.body;
+      const { domain } = req.body;
       
       if (!domain) {
         return res.status(400).json({ 
@@ -767,149 +597,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Check if this is the primary domain or an additional domain
-      let isPrimaryDomain = false;
-      let additionalDomains: (string | DomainInfo)[] = [];
-      let expectedCnameTarget: string | null = null;
-      
-      if (settings.customDomain === domain) {
-        isPrimaryDomain = true;
-        expectedCnameTarget = settings.domainCnameTarget || `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
-      } else {
-        // Check in additional domains
-        try {
-          additionalDomains = JSON.parse(settings.additionalDomains || '[]');
-          
-          // Handle both old string format and new object format
-          if (!Array.isArray(additionalDomains)) {
-            additionalDomains = [];
-          }
-          
-          // Find domain in additional domains to get the CNAME target
-          const domainObj = additionalDomains.find(d => {
-            if (typeof d === 'string') {
-              return d === domain;
-            } else {
-              return d.domain === domain;
-            }
-          });
-          
-          if (domainObj && typeof domainObj !== 'string') {
-            expectedCnameTarget = domainObj.cnameTarget;
-          }
-          
-        } catch (err) {
-          console.error("Error parsing additional domains:", err);
-          additionalDomains = [];
-        }
+      // Generate a CNAME target if one doesn't exist
+      let cnameTarget = settings.domainCnameTarget;
+      if (!cnameTarget) {
+        cnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
       }
       
-      // If not skipping DNS check and we have a CNAME target, verify the CNAME record
-      if (!skipDnsCheck && expectedCnameTarget) {
-        try {
-          // Import our DNS verification utility
-          const { verifyDomain } = require('./utils/dnsVerifier');
-          
-          // Configure verification options
-          const verificationOptions = {
-            maxRetries: 3,       // Number of retries for DNS lookups
-            retryDelay: 2000,    // Initial delay between retries (will increase with exponential backoff)
-            timeoutMs: 5000      // Timeout for each DNS lookup attempt
-          };
-          
-          // Perform full domain verification (checks both CNAME and TXT records)
-          const dnsResult = await verifyDomain(domain, expectedCnameTarget, verificationOptions);
-          
-          if (!dnsResult.success) {
-            return res.status(400).json({
-              success: false,
-              message: dnsResult.error || `CNAME verification failed. Please set a CNAME record for ${domain} pointing to ${expectedCnameTarget}`,
-              details: dnsResult.details,
-              records: dnsResult.records
-            });
-          }
-          
-          // Log success for monitoring purposes
-          console.log(`Domain ${domain} successfully verified with target ${expectedCnameTarget}`, 
-            dnsResult.details || 'via CNAME record');
-        } catch (dnsError) {
-          console.error("DNS verification error:", dnsError);
+      try {
+        // Import our DNS verification utility
+        const { verifyDomain } = require('./utils/dnsVerifier');
+        
+        // Configure verification options
+        const verificationOptions = {
+          maxRetries: 3,       // Number of retries for DNS lookups
+          retryDelay: 2000,    // Initial delay between retries (will increase with exponential backoff)
+          timeoutMs: 5000      // Timeout for each DNS lookup attempt
+        };
+        
+        // Perform domain verification (checks CNAME record)
+        const dnsResult = await verifyDomain(domain, cnameTarget, verificationOptions);
+        
+        if (!dnsResult.success) {
           return res.status(400).json({
             success: false,
-            message: `Could not verify CNAME record. Ensure a CNAME record for ${domain} is set to ${expectedCnameTarget}`,
-            details: dnsError instanceof Error ? dnsError.message : "DNS lookup failed"
+            message: `CNAME verification failed. Please set a CNAME record for ${domain} pointing to ${cnameTarget}`,
+            cnameTarget: cnameTarget
           });
         }
-      }
-      
-      if (isPrimaryDomain) {
-        // Verify primary domain
+        
+        // Log success for monitoring purposes
+        console.log(`Domain ${domain} successfully verified with target ${cnameTarget}`);
+        
+        // Update domain verification settings
         const updatedSettings = await storage.updateSettings({
           customDomain: domain,
-          domainCnameTarget: expectedCnameTarget || settings.domainCnameTarget,
+          domainCnameTarget: cnameTarget,
           domainVerified: true
         });
         
         return res.status(200).json({
           success: true,
-          message: "Primary domain verified successfully",
-          isPrimary: true,
-          cnameTarget: expectedCnameTarget,
+          message: "Domain verified successfully",
+          cnameTarget: cnameTarget,
           settings: updatedSettings
         });
-      } else {
-        // Verify additional domain
-        const domainIndex = additionalDomains.findIndex(d => {
-          if (typeof d === 'string') {
-            return d === domain;
-          } else {
-            return d.domain === domain;
-          }
-        });
-        
-        if (domainIndex === -1) {
-          return res.status(404).json({
-            success: false,
-            message: "Domain not found in additional domains"
-          });
-        }
-        
-        // Update the domain verification status
-        if (typeof additionalDomains[domainIndex] === 'string') {
-          // Convert old format to new format
-          const domainString = additionalDomains[domainIndex] as string;
-          const newCnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
-          const domainInfo: DomainInfo = {
-            domain: domainString,
-            cnameTarget: newCnameTarget,
-            verified: true
-          };
-          additionalDomains[domainIndex] = domainInfo;
-          expectedCnameTarget = newCnameTarget;
-        } else {
-          // Update existing object
-          const domainObj = additionalDomains[domainIndex] as DomainInfo;
-          domainObj.verified = true;
-        }
-        
-        // Save updated domains
-        const updatedSettings = await storage.updateSettings({
-          additionalDomains: JSON.stringify(additionalDomains)
-        });
-        
-        return res.status(200).json({
-          success: true,
-          message: "Additional domain verified successfully",
-          isPrimary: false,
-          cnameTarget: expectedCnameTarget,
-          settings: updatedSettings
+      } catch (dnsError) {
+        console.error("DNS verification error:", dnsError);
+        return res.status(400).json({
+          success: false,
+          message: `Could not verify CNAME record. Ensure a CNAME record for ${domain} is set to ${cnameTarget}`,
+          cnameTarget: cnameTarget
         });
       }
     } catch (error) {
       console.error("Error verifying domain:", error);
       return res.status(500).json({ 
         success: false,
-        message: error instanceof Error ? error.message : "Failed to verify domain" 
+        message: "Failed to verify domain. Please try again later."
       });
     }
   });
