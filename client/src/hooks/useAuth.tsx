@@ -83,6 +83,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await apiRequest('POST', '/api/auth/logout');
       setUser(null);
+      
+      // Force a reload of the page to clear any client state
+      window.location.href = '/auth';
     } catch (err) {
       console.error('Error during logout:', err);
     } finally {

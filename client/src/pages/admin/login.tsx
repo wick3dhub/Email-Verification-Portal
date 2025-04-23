@@ -18,9 +18,16 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+
+  // Redirect to admin dashboard if user is already logged in
+  if (user) {
+    // We need this to happen after rendering to avoid invalid hooks order
+    setTimeout(() => navigate("/admin"), 0);
+    return null;
+  }
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),

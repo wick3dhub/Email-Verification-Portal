@@ -28,10 +28,10 @@ export async function setupAuth(app: Express, pool: Pool) {
         createTableIfMissing: true,
       }),
       secret: sessionSecret,
-      resave: false,
-      saveUninitialized: false,
+      resave: true, // Changed to true to ensure session is saved
+      saveUninitialized: true, // Changed to true to help with new sessions
       cookie: {
-        secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+        secure: false, // Disable secure for development
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
         sameSite: 'lax', // Add SameSite attribute
