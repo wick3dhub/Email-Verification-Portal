@@ -6,8 +6,9 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import EmailEntryForm from "@/components/admin/EmailEntryForm";
 import VerificationStatusTable from "@/components/admin/VerificationStatusTable";
 import SettingsForm from "@/components/admin/SettingsForm";
+import CredentialsForm from "@/components/admin/CredentialsForm";
 import { Button } from "@/components/ui/button";
-import { Shield, Lock } from "lucide-react";
+import { Shield, Lock, Settings, UserCog } from "lucide-react";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -79,7 +80,10 @@ export default function Dashboard() {
           </TabsContent>
           
           <TabsContent value="settings">
-            <SettingsForm />
+            <div className="space-y-6">
+              <CredentialsForm />
+              <SettingsForm />
+            </div>
           </TabsContent>
         </Tabs>
       </div>

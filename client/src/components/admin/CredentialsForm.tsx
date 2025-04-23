@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Lock, Loader2, Save } from "lucide-react";
+import { Lock, Loader2, Save, CheckCircle } from "lucide-react";
 
 import {
   Card,
