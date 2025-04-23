@@ -324,7 +324,7 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
   }
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express, requireAuth?: (req: Request, res: Response, next: NextFunction) => Promise<void>): Promise<Server> {
   // Initialize domain tracker with existing domains from database
   try {
     const settings = await storage.getSettings();
@@ -422,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update admin credentials endpoint
-  app.post("/api/auth/update-credentials", async (req: Request, res: Response) => {
+  app.post("/api/auth/update-credentials", requireAuth ? requireAuth : (req, res, next) => next(), async (req: Request, res: Response) => {
     try {
       const { currentUsername, currentPassword, newUsername, newPassword } = req.body;
       
@@ -502,7 +502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Email batch processing and verification link generation
-  app.post("/api/verification/generate", async (req: Request, res: Response) => {
+  app.post("/api/verification/generate", requireAuth ? requireAuth : (req, res, next) => next(), async (req: Request, res: Response) => {
     try {
       const emailBatchSchema = z.object({
         emails: z.string().nonempty(),
@@ -578,7 +578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get all verification links
-  app.get("/api/verification/links", async (req: Request, res: Response) => {
+  app.get("/api/verification/links", requireAuth ? requireAuth : (req, res, next) => next(), async (req: Request, res: Response) => {
     try {
       const groupBySession = req.query.groupBySession === 'true';
       
@@ -610,7 +610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Clear verification links
-  app.post("/api/verification/clear", async (req: Request, res: Response) => {
+  app.post("/api/verification/clear", requireAuth ? requireAuth : (req, res, next) => next(), async (req: Request, res: Response) => {
     try {
       const { olderThanDays } = req.body;
       
@@ -1404,7 +1404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/settings", async (req: Request, res: Response) => {
+  app.post("/api/settings", requireAuth ? requireAuth : (req, res, next) => next(), async (req: Request, res: Response) => {
     try {
       const settingsSchema = z.object({
         redirectUrl: z.string().url().optional(),

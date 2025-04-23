@@ -7,27 +7,41 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  checkAuthStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start as loading to check auth on init
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user is already logged in (from localStorage)
+  // Check auth status on component mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('auth_user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (err) {
-        localStorage.removeItem('auth_user');
-      }
-    }
+    checkAuthStatus();
   }, []);
+
+  // Function to check if user is already authenticated
+  const checkAuthStatus = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiRequest('GET', '/api/auth/check');
+      const data = await response.json();
+      
+      if (data.authenticated && data.user) {
+        setUser(data.user);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error('Error checking auth status:', err);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (credentials: LoginCredentials) => {
     setIsLoading(true);
@@ -36,9 +50,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response = await apiRequest('POST', '/api/auth/login', credentials);
       const userData: AuthUser = await response.json();
-      
-      // Store user in localStorage
-      localStorage.setItem('auth_user', JSON.stringify(userData));
       setUser(userData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -48,9 +59,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('auth_user');
-    setUser(null);
+  const logout = async () => {
+    setIsLoading(true);
+    try {
+      await apiRequest('POST', '/api/auth/logout');
+      setUser(null);
+    } catch (err) {
+      console.error('Error during logout:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

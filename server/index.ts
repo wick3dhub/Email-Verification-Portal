@@ -2,11 +2,12 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
 import { createHash } from "crypto";
 import { createRateLimiters } from "./middleware/rateLimiter";
+import { setupAuth } from "./auth";
 
 const app = express();
 app.use(express.json());
@@ -103,12 +104,15 @@ app.use((req, res, next) => {
   // Initialize rate limiters
   const rateLimiters = await createRateLimiters();
   
+  // Set up authentication with sessions
+  const { requireAuth } = await setupAuth(app, pool);
+  
   // Apply rate limiters to api routes
   app.use('/api/auth', rateLimiters.auth);
   app.use('/api/verification', rateLimiters.verification);
   app.use('/api', rateLimiters.general);
   
-  const server = await registerRoutes(app);
+  const server = await registerRoutes(app, requireAuth);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
