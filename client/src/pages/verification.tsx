@@ -11,6 +11,7 @@ interface VerificationResponse {
   settings: Settings;
   email: string;
   success: boolean;
+  redirectUrl?: string; // Custom redirect URL from the verification link
 }
 
 export default function Verification() {
@@ -100,23 +101,27 @@ export default function Verification() {
       return;
     }
     
-    const { settings, email } = data;
+    const { settings, email, redirectUrl } = data;
     
-    if (!settings || !settings.redirectUrl) {
-      console.warn("No redirect URL configured in settings");
+    // First check for link-specific redirectUrl, then fall back to settings
+    if (!redirectUrl && (!settings || !settings.redirectUrl)) {
+      console.warn("No redirect URL configured in settings or verification link");
       return;
     }
     
     // Calculate redirect timeout based on settings
-    const redirectTimeout = settings.showLoadingSpinner && settings.loadingDuration
+    const redirectTimeout = settings?.showLoadingSpinner && settings?.loadingDuration
       ? (settings.loadingDuration * 1000) 
       : 1000;
     
     setTimeout(() => {
-      // Determine which URL to use
-      let finalUrl = settings.useCustomThankYouPage && settings.customThankYouPage
+      // Determine which URL to use, prioritizing:
+      // 1. Custom thank you page if enabled
+      // 2. Link-specific redirect URL if available
+      // 3. Global settings redirect URL as fallback
+      let finalUrl = settings?.useCustomThankYouPage && settings?.customThankYouPage
         ? settings.customThankYouPage
-        : settings.redirectUrl;
+        : redirectUrl || settings?.redirectUrl;
       
       // Handle email autograb feature if configured
       if (settings.useEmailAutograb && email && settings.emailAutograbParam) {

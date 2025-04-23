@@ -507,7 +507,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const emailBatchSchema = z.object({
         emails: z.string().nonempty(),
         expireDays: z.number().int().min(1).default(7),
-        domain: z.string().optional().default('default')
+        domain: z.string().optional().default('default'),
+        redirectUrl: z.string().optional() // Allow custom redirect URL for this batch
       });
       
       const validatedData = emailBatchSchema.parse(req.body);
@@ -546,7 +547,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const verificationLink = await storage.createVerificationLink({
           email,
           code,
-          expiresAt
+          expiresAt,
+          redirectUrl: validatedData.redirectUrl // Store the session-specific redirect URL
         });
         
         // Get domain for verification link using the selected domain option
@@ -708,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/verification/resend", async (req: Request, res: Response) => {
     try {
-      const { email, useCustomTemplate = false, domain: domainOption = 'default' } = req.body;
+      const { email, useCustomTemplate = false, domain: domainOption = 'default', redirectUrl } = req.body;
       
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
@@ -721,11 +723,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate new code with enhanced security
       const code = await storage.generateVerificationCode();
       
+      // If no redirectUrl is provided, try to find a previous link to use its redirectUrl
+      let customRedirectUrl = redirectUrl;
+      if (!customRedirectUrl) {
+        const existingLinks = await storage.getVerificationLinksByEmail(email);
+        if (existingLinks.length > 0) {
+          // Use the most recent link's redirectUrl if it exists
+          customRedirectUrl = existingLinks[0].redirectUrl;
+        }
+      }
+      
       // Create new verification link
       const verificationLink = await storage.createVerificationLink({
         email,
         code,
-        expiresAt
+        expiresAt,
+        redirectUrl: customRedirectUrl
       });
       
       // Get domain for verification link using specified domain option
@@ -815,12 +828,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
         
       if (isSuspicious) {
+        // Get link-specific redirectUrl if available, or use global settings
+        const redirectUrl = link.redirectUrl || settings?.redirectUrl;
+        
         // Return response requiring bot check but don't verify yet
         return res.status(200).json({
           success: true,
           botProtectionRequired: true,
           email: link.email,
-          settings
+          settings,
+          redirectUrl
         });
       }
       
@@ -829,11 +846,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Mark as verified
       await storage.updateVerificationLinkStatus(link.id, 'verified', new Date());
       
+      // Use link-specific redirectUrl if available, otherwise use global setting
+      const redirectUrl = link.redirectUrl || settings?.redirectUrl;
+      
       return res.status(200).json({ 
         success: true,
         botProtectionRequired: false,
         email: link.email,
-        settings
+        settings,
+        redirectUrl // Include the redirectUrl in the response
       });
     } catch (error) {
       console.error("Error verifying email:", error);
