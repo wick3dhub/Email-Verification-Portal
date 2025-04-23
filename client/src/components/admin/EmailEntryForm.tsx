@@ -237,9 +237,9 @@ export default function EmailEntryForm() {
   const handleCopyLinks = () => {
     if (!generatedLinks) return;
     
-    const host = window.location.origin;
+    // link.url already contains the full URL with domain
     const linksText = generatedLinks.links
-      .map(link => `${host}${link.url}`)
+      .map(link => link.url)
       .join('\n');
     
     navigator.clipboard.writeText(linksText)
@@ -491,7 +491,8 @@ export default function EmailEntryForm() {
             <div className="border border-gray-300 rounded-md bg-gray-50 p-4 h-64 overflow-y-auto">
               <pre className="text-xs text-gray-600 whitespace-pre-wrap">
                 {generatedLinks.links.map(link => (
-                  `${window.location.origin}${link.url}\n`
+                  // link.url already contains the full URL with domain
+                  `${link.url}\n`
                 ))}
               </pre>
             </div>
