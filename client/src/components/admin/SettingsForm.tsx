@@ -605,8 +605,19 @@ export default function SettingsForm() {
                     control={form.control}
                     name="additionalDomains"
                     render={({ field }) => {
-                      // Parse the JSON string to an array
-                      const domainsArray = field.value ? JSON.parse(field.value) : [];
+                      // Parse the JSON string to an array with error handling
+                      let domainsArray = [];
+                      try {
+                        domainsArray = field.value ? JSON.parse(field.value) : [];
+                        // Ensure it's an array
+                        if (!Array.isArray(domainsArray)) {
+                          console.error("additionalDomains is not an array, resetting to empty array");
+                          domainsArray = [];
+                        }
+                      } catch (error) {
+                        console.error("Error parsing additionalDomains JSON:", error);
+                        domainsArray = [];
+                      }
                       
                       // Local state for new domain input
                       const [newDomain, setNewDomain] = useState("");
@@ -618,7 +629,12 @@ export default function SettingsForm() {
                         if (!newDomain) return;
                         
                         // Check if domain already exists in local array first
-                        if (domainsArray.includes(newDomain)) {
+                        const domainExists = domainsArray.some((domain: any) => 
+                          (typeof domain === 'string' && domain === newDomain) || 
+                          (typeof domain === 'object' && domain.domain === newDomain)
+                        );
+                        
+                        if (domainExists) {
                           toast({
                             title: "Domain already exists",
                             description: "This domain is already in your list.",
