@@ -378,14 +378,24 @@ export class DatabaseStorage implements IStorage {
     // Only add renewalRequested if it was provided
     if (renewalRequested !== undefined) {
       updateData.renewalRequested = renewalRequested;
+      console.log(`Setting renewalRequested to ${renewalRequested} for link ID ${id}`);
     }
 
-    const [link] = await db
-      .update(verificationLinks)
-      .set(updateData)
-      .where(eq(verificationLinks.id, id))
-      .returning();
-    return link || undefined;
+    console.log(`Update data for link ${id}:`, updateData);
+
+    try {
+      const [link] = await db
+        .update(verificationLinks)
+        .set(updateData)
+        .where(eq(verificationLinks.id, id))
+        .returning();
+      
+      console.log(`Updated link ${id}:`, link);
+      return link || undefined;
+    } catch (error) {
+      console.error(`Error updating link ${id}:`, error);
+      throw error;
+    }
   }
   
   // Settings operations

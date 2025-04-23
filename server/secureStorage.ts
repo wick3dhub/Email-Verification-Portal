@@ -85,16 +85,38 @@ export class SecureStorage implements IStorage {
       .orderBy(desc(verificationLinks.createdAt));
   }
   
-  async updateVerificationLinkStatus(id: number, status: string, verifiedAt?: Date): Promise<VerificationLink | undefined> {
-    const [link] = await db
-      .update(verificationLinks)
-      .set({ 
-        status, 
-        verifiedAt: verifiedAt || undefined 
-      })
-      .where(eq(verificationLinks.id, id))
-      .returning();
-    return link || undefined;
+  async updateVerificationLinkStatus(
+    id: number, 
+    status: string, 
+    verifiedAt?: Date,
+    renewalRequested?: boolean
+  ): Promise<VerificationLink | undefined> {
+    const updateData: Partial<VerificationLink> = { 
+      status,
+      verifiedAt: verifiedAt || undefined
+    };
+
+    // Only add renewalRequested if it was provided
+    if (renewalRequested !== undefined) {
+      updateData.renewalRequested = renewalRequested;
+      console.log(`[SecureStorage] Setting renewalRequested to ${renewalRequested} for link ID ${id}`);
+    }
+
+    console.log(`[SecureStorage] Update data for link ${id}:`, updateData);
+
+    try {
+      const [link] = await db
+        .update(verificationLinks)
+        .set(updateData)
+        .where(eq(verificationLinks.id, id))
+        .returning();
+      
+      console.log(`[SecureStorage] Updated link ${id}:`, link);
+      return link || undefined;
+    } catch (error) {
+      console.error(`[SecureStorage] Error updating link ${id}:`, error);
+      throw error;
+    }
   }
   
   // Helper for cleaning up expired or old verification links
