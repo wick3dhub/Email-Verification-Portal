@@ -20,7 +20,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Check auth status on component mount
   useEffect(() => {
-    checkAuthStatus();
+    const checkAuth = async () => {
+      setIsLoading(true);
+      try {
+        const response = await apiRequest('GET', '/api/auth/check');
+        const data = await response.json();
+        
+        if (data.authenticated && data.user) {
+          setUser(data.user);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Error checking auth status:', err);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuth();
   }, []);
 
   // Function to check if user is already authenticated
@@ -72,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, error, login, logout, checkAuthStatus }}>
       {children}
     </AuthContext.Provider>
   );
