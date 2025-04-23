@@ -643,23 +643,26 @@ export default function SettingsForm() {
                   />
                 )}
                 
-                <FormField
-                  control={form.control}
-                  name="domainVerified"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Domain Verification Status</FormLabel>
-                        <FormDescription>
-                          {field.value ? "Domain has been verified" : "Domain verification pending"}
-                        </FormDescription>
-                      </div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${field.value ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
-                        {field.value ? "Verified" : "Pending"}
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                {/* Only show verification status if a domain has been added */}
+                {form.watch('customDomain') && (
+                  <FormField
+                    control={form.control}
+                    name="domainVerified"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Domain Verification Status</FormLabel>
+                          <FormDescription>
+                            {field.value ? "Domain has been verified" : "Domain verification pending"}
+                          </FormDescription>
+                        </div>
+                        <div className={`px-3 py-1 rounded-full text-xs font-medium ${field.value ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
+                          {field.value ? "Verified" : "Pending"}
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                )}
                 
                 <div className="flex flex-col">
                   <Button
