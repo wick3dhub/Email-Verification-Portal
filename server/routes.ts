@@ -1126,8 +1126,9 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
       // Start background verification process
       // This will check the domain periodically without blocking the user
       // Store domain in our tracker for consistent verification
+      const isPrimaryDomain = (!settings.customDomain || settings.customDomain === '' || settings.customDomain === domain);
       domainTracker.addDomain(domain, cnameTarget, isPrimaryDomain);
-      console.log(`Added domain ${domain} to tracker with CNAME target ${cnameTarget}`);
+      console.log(`Added domain ${domain} to tracker with CNAME target ${cnameTarget} (isPrimary: ${isPrimaryDomain})`);
       
       setTimeout(() => {
         console.log(`Starting background verification for ${domain} with target ${cnameTarget}`);
