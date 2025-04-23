@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
@@ -8,22 +8,11 @@ import crypto from "crypto";
 import multer from "multer";
 import os from "os";
 import type { Setting } from "@shared/schema";
+import { domainTracker } from "./services/domainTracker";
 
-// Define global types for the application
-declare global {
-  namespace NodeJS {
-    interface Global {
-      recentlyAddedDomain?: {
-        domain: string;
-        cnameTarget: string;
-        timestamp: number;
-      };
-    }
-  }
-}
-
-// Initialize the global domain tracking object
-global.recentlyAddedDomain = undefined;
+// This file uses the domainTracker service to improve domain verification reliability
+// The tracker ensures domain/CNAME pairs are properly tracked between frontend and backend
+// throughout the verification process, regardless of database sync timing.
 
 // Define interface for domain objects
 interface DomainInfo {
@@ -1044,6 +1033,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Domain check request: domain=${domain}, recentlyAddedDomain=${recentlyAddedDomain}, recentlyCnameTarget=${recentlyCnameTarget}`);
       
+      // Check domain tracker first for most recent domain information
+      const trackedDomain = domainTracker.getDomain(domain);
+      
       if (!domain) {
         console.log("Domain check error: No domain provided");
         return res.status(400).json({ 
@@ -1077,23 +1069,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Error parsing additional domains for logging:`, e);
       }
       
-      // Determine whether this is the primary domain or an additional domain
+      // DOMAIN RESOLUTION PRIORITY:
+      // 1. Check if the domain is in our domain tracker
+      // 2. Check if it matches the request parameters (recentlyAddedDomain)
+      // 3. Check if it's the primary domain in settings
+      // 4. Check if it's in the additional domains list
+      
       let isPrimaryDomain = settings.customDomain === domain;
       let cnameTarget = settings.domainCnameTarget;
       let domainInfo: any = null;
+      let domainFound = isPrimaryDomain;
       
       console.log(`Is primary domain: ${isPrimaryDomain}`);
       
-      // If we received a recently added domain and CNAME target in the request, we should use those
-      // This handles the case where a user just added a domain and is checking verification
-      // before the database state is fully updated
-      if (recentlyAddedDomain && recentlyCnameTarget && domain === recentlyAddedDomain) {
-        console.log(`Using recently added domain data: domain=${recentlyAddedDomain} with target=${recentlyCnameTarget}`);
-        // Override all other checks - we'll use the recently added domain info
-        isPrimaryDomain = true; // Treat it as primary for simplicity
-        cnameTarget = recentlyCnameTarget;
+      // Check if the domain is in our tracker
+      if (trackedDomain) {
+        console.log(`Found domain in tracker: ${trackedDomain.domain} with target ${trackedDomain.cnameTarget}`);
+        cnameTarget = trackedDomain.cnameTarget;
+        isPrimaryDomain = !!trackedDomain.isPrimary;
+        domainFound = true;
       }
-      // If it's not a primary domain or recently added domain, check additional domains
+      // If we received a recently added domain and CNAME target in the request, use those
+      else if (recentlyAddedDomain && recentlyCnameTarget && domain === recentlyAddedDomain) {
+        console.log(`Using recently added domain data from request: domain=${recentlyAddedDomain} with target=${recentlyCnameTarget}`);
+        cnameTarget = recentlyCnameTarget;
+        domainFound = true;
+        
+        // Since this is a valid domain not in our tracker yet, add it
+        domainTracker.addDomain(domain, recentlyCnameTarget, isPrimaryDomain);
+      }
+      // If it's not primary or in tracker, check additional domains
       else if (!isPrimaryDomain) {
         console.log(`Not a primary domain, checking additional domains list`);
         try {
@@ -1105,35 +1110,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (domainInfo) {
             console.log(`Found domain in additional domains with details:`, domainInfo);
             cnameTarget = domainInfo.cnameTarget;
+            domainFound = true;
+            
+            // Add to tracker for future lookups
+            domainTracker.addDomain(domain, domainInfo.cnameTarget, false);
           } else {
             console.log(`Domain not found in additional domains`);
-            // If the domain wasn't found in the additional domains, but we have recent domain info,
-            // use that as a fallback
+            // If the domain wasn't found in additional domains, but we still have request params, use those
             if (recentlyAddedDomain && recentlyCnameTarget) {
-              console.log(`Domain ${domain} not found in settings, but using recently added domain data as fallback`);
+              console.log(`Using request parameters as fallback`);
               cnameTarget = recentlyCnameTarget;
-            } else {
-              console.log(`Domain ${domain} not found in settings and no recent data available`);
-              return res.status(400).json({
-                success: false,
-                message: "Domain not found in registered domains"
-              });
+              domainFound = true;
+              
+              // Add to tracker
+              domainTracker.addDomain(domain, recentlyCnameTarget, false);
             }
           }
         } catch (err) {
           console.error("Error parsing additional domains during check:", err);
-          // Even if there's an error parsing, if we have recently added domain info, use that
+          // Even if there's an error parsing, if we have request parameters, use those
           if (recentlyAddedDomain && recentlyCnameTarget) {
-            console.log(`Error parsing additional domains, but using recently added domain data as fallback`);
+            console.log(`Error parsing, but using request parameters as fallback`);
             cnameTarget = recentlyCnameTarget;
-          } else {
-            console.log(`Error parsing additional domains and no fallback data available`);
-            return res.status(500).json({
-              success: false,
-              message: "Error processing additional domains"
-            });
+            domainFound = true;
           }
         }
+      }
+      
+      // If domain wasn't found anywhere, return error
+      if (!domainFound) {
+        console.log(`Domain ${domain} not found in tracker, settings, or request parameters`);
+        return res.status(400).json({
+          success: false,
+          message: "Domain not found in registered domains"
+        });
       }
       
       if (!cnameTarget) {
