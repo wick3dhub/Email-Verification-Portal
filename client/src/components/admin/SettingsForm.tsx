@@ -669,7 +669,7 @@ export default function SettingsForm() {
                     type="button"
                     variant="outline"
                     className="self-start"
-                    disabled={updateMutation.isPending || checkingDomain}
+                    disabled={updateMutation.isPending}
                     onClick={async () => {
                       try {
                         const domain = form.getValues('customDomain');
@@ -695,6 +695,8 @@ export default function SettingsForm() {
                             form.setValue('domainVerified', data.settings.domainVerified);
                             form.setValue('domainCnameTarget', data.settings.domainCnameTarget);
                             form.setValue('useCustomDomain', true);
+                            // Store the domain in the database but clear the input field for adding more domains
+                            form.setValue('customDomain', '');
                           }
                           
                           toast({
@@ -734,10 +736,12 @@ export default function SettingsForm() {
                     {checkingDomain ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Verifying...
+                        Verifying in background...
                       </>
                     ) : (
-                      "Add Domain"
+                      <>
+                        {form.watch('customDomain') && form.watch('domainCnameTarget') ? "Add Another Domain" : "Add Domain"}
+                      </>
                     )}
                   </Button>
                 </div>
