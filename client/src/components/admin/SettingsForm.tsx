@@ -19,7 +19,8 @@ import {
   CircleAlert, 
   Globe, 
   ArrowRight, 
-  RefreshCw 
+  RefreshCw,
+  Copy
 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
@@ -94,6 +95,85 @@ export default function SettingsForm() {
   
   // Interval for checking domain verification
   const [checkingDomain, setCheckingDomain] = useState(false);
+  
+  // Function to check domain verification status
+  const checkDomainVerification = async (domain: string) => {
+    try {
+      const res = await apiRequest("POST", "/api/domain/check", { domain });
+      const data = await res.json();
+      
+      if (data.success && data.verified) {
+        // Domain is verified
+        form.setValue('domainVerified', true);
+        setCheckingDomain(false);
+        
+        // Show success message
+        toast({
+          title: "Domain verified",
+          description: "Your domain has been successfully verified and is ready to use.",
+        });
+        
+        // Hide DNS instructions since verification is complete
+        setDnsInstructions(prev => ({ ...prev, showInstructions: false }));
+        
+        // Refresh settings data
+        queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("Error checking domain:", error);
+      return false;
+    }
+  };
+  
+  // Function to start checking domain verification in the background
+  const startDomainVerificationCheck = (domain: string) => {
+    // Set checking state to show spinner
+    setCheckingDomain(true);
+    
+    // Initial delay before first check (5 seconds)
+    const initialDelayMs = 5000;
+    
+    // Start checking after initial delay
+    setTimeout(() => {
+      // Variable to track verification attempts
+      let attempts = 0;
+      const maxAttempts = 20; // Maximum number of attempts
+      const checkIntervalMs = 30000; // Check every 30 seconds
+      
+      // Function to perform verification check with exponential backoff
+      const performCheck = async () => {
+        attempts++;
+        
+        // Try to verify the domain
+        const isVerified = await checkDomainVerification(domain);
+        
+        if (isVerified) {
+          // Domain verified successfully, stop checking
+          return;
+        }
+        
+        if (attempts >= maxAttempts) {
+          // Reached maximum attempts, stop checking
+          setCheckingDomain(false);
+          toast({
+            title: "Verification timeout",
+            description: "Domain verification is taking longer than expected. Please check your DNS settings and try again later.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Schedule next check
+        setTimeout(performCheck, checkIntervalMs);
+      };
+      
+      // Start the verification checks
+      performCheck();
+    }, initialDelayMs);
+  };
 
   // Fetch current settings
   const { data: settings, isLoading, error } = useQuery<Settings>({
@@ -153,6 +233,26 @@ export default function SettingsForm() {
       telegramChatId: "",
     },
   });
+
+  // Initialize DNS instructions if domain is already set up
+  useEffect(() => {
+    if (settings && settings.useCustomDomain && settings.customDomain && settings.domainCnameTarget) {
+      // If domain is verified, just show the success state
+      if (!settings.domainVerified) {
+        // If domain is set but not verified, show instructions for configuration
+        setDnsInstructions({
+          domain: settings.customDomain,
+          cnameTarget: settings.domainCnameTarget,
+          showInstructions: true
+        });
+        
+        // Start background verification if not already verified
+        if (!checkingDomain) {
+          startDomainVerificationCheck(settings.customDomain);
+        }
+      }
+    }
+  }, [settings]);
 
   // Update form values when settings are loaded
   useEffect(() => {
@@ -563,7 +663,7 @@ export default function SettingsForm() {
                     type="button"
                     variant="outline"
                     className="self-start"
-                    disabled={updateMutation.isPending}
+                    disabled={updateMutation.isPending || checkingDomain}
                     onClick={async () => {
                       try {
                         const domain = form.getValues('customDomain');
@@ -605,6 +705,9 @@ export default function SettingsForm() {
                             cnameTarget: data.cnameTarget,
                             showInstructions: true
                           });
+                          
+                          // Start checking the domain in the background
+                          startDomainVerificationCheck(domain);
                         } else {
                           toast({
                             title: "Failed to add domain",
@@ -622,17 +725,110 @@ export default function SettingsForm() {
                       }
                     }}
                   >
-                    {updateMutation.isPending ? (
+                    {checkingDomain ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Verifying...
                       </>
                     ) : (
-                      "Verify Domain"
+                      "Add Domain"
                     )}
                   </Button>
                 </div>
 
+                {/* DNS configuration instructions */}
+                {dnsInstructions.showInstructions && (
+                  <Alert className="mt-4 bg-blue-50 border-blue-200">
+                    <Globe className="h-4 w-4 text-blue-500" />
+                    <AlertTitle className="text-blue-700">DNS Configuration Required</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      <p className="mb-2">
+                        To verify your domain, add the following CNAME record in your DNS settings:
+                      </p>
+                      
+                      <div className="bg-white p-3 rounded border border-blue-200 mb-3 font-mono text-sm">
+                        <p><span className="font-semibold">Domain:</span> {dnsInstructions.domain}</p>
+                        <p><span className="font-semibold">Record Type:</span> CNAME</p>
+                        <div className="flex items-center">
+                          <p><span className="font-semibold">Points to:</span> {dnsInstructions.cnameTarget}</p>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="ml-2 h-6 w-6 p-0"
+                            onClick={() => {
+                              navigator.clipboard.writeText(dnsInstructions.cnameTarget);
+                              toast({ title: "Copied", description: "CNAME target copied to clipboard" });
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <p className="mb-2 text-sm">
+                        DNS changes can take up to 24-48 hours to propagate, but often complete within minutes.
+                        We'll automatically check and verify your domain once the DNS records are updated.
+                      </p>
+                      
+                      <div className="flex items-center mt-3">
+                        <div className={`h-2 w-2 rounded-full ${checkingDomain ? 'bg-amber-500 animate-pulse' : 'bg-blue-500'} mr-2`}></div>
+                        <span className="text-sm font-medium text-blue-700">
+                          {checkingDomain 
+                            ? "Verification in progress - checking DNS records..." 
+                            : "Waiting for DNS configuration"}
+                        </span>
+                      </div>
+                      
+                      {form.watch('domainVerified') && (
+                        <div className="mt-2 text-green-600 flex items-center">
+                          <CircleCheck className="h-4 w-4 mr-1" />
+                          <span>Domain verified successfully!</span>
+                        </div>
+                      )}
+                      
+                      <div className="mt-3 flex justify-end">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          disabled={checkingDomain}
+                          onClick={() => {
+                            // Try to manually check verification
+                            const domain = form.getValues('customDomain');
+                            if (domain) {
+                              toast({
+                                title: "Checking domain",
+                                description: "Verifying DNS configuration...",
+                              });
+                              
+                              checkDomainVerification(domain);
+                            }
+                          }}
+                        >
+                          {checkingDomain ? (
+                            <>
+                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              Checking...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="mr-2 h-3 w-3" />
+                              Check Now
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {/* Domain status indicator when verified */}
+                {form.watch('useCustomDomain') && form.watch('customDomain') && form.watch('domainVerified') && !dnsInstructions.showInstructions && (
+                  <div className="mt-3 flex items-center text-green-600 bg-green-50 p-2 rounded">
+                    <CircleCheck className="h-4 w-4 mr-2" />
+                    <span>Domain <strong>{form.watch('customDomain')}</strong> is verified and active</span>
+                  </div>
+                )}
 
               </>
             )}
