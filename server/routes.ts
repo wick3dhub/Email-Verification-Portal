@@ -32,6 +32,7 @@ async function verifyDomainInBackground(
   maxAttempts: number = 30, 
   delayMs: number = 20000 // Default 20s between attempts
 ) {
+  console.log(`[Background Verification] Starting for domain ${domain} with target ${cnameTarget} (attempt ${attempts+1}/${maxAttempts})`);
   // Skip if reached max attempts
   if (attempts >= maxAttempts) {
     console.log(`Maximum verification attempts (${maxAttempts}) reached for domain: ${domain}`);
@@ -783,6 +784,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      console.log(`Adding domain: ${domain}`);
+      
       // Simple domain validation
       if (!domain.match(/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/)) {
         return res.status(400).json({
@@ -803,9 +806,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate a random CNAME target
       const cnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
+      console.log(`Generated CNAME target: ${cnameTarget}`);
       
       // Check if this is the first domain being added
       if (!settings.customDomain || settings.customDomain === '') {
+        console.log(`Adding as primary domain: ${domain}`);
+        
         // Update settings with new domain as the primary domain (unverified initially)
         // Update the settings immediately with the domain
         await storage.updateSettings({
@@ -863,14 +869,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Return updated settings
-      const updatedSettings = await storage.getSettings();
+      const finalSettings = await storage.getSettings();
       
       // Start background verification process
       // This will check the domain periodically without blocking the user
       setTimeout(() => {
         console.log(`Starting background verification for ${domain} with target ${cnameTarget}`);
-        console.log(`Settings have been saved, primary domain: ${updatedSettings?.customDomain}`);
-        console.log(`Additional domains: ${updatedSettings?.additionalDomains}`);
+        console.log(`Settings have been saved, primary domain: ${finalSettings?.customDomain}`);
+        console.log(`Additional domains: ${finalSettings?.additionalDomains}`);
         
         // Verify the domain without blocking, after settings have been fully saved
         verifyDomainInBackground(domain, cnameTarget);
@@ -885,7 +891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         instructions: `Create a CNAME record pointing from ${domain} to ${cnameTarget}`,
         verificationStatus: "pending",
         note: "Domain verification will happen automatically in the background. You can continue adding more domains.",
-        settings: updatedSettings // Include updated settings so frontend can use this data
+        settings: finalSettings // Include updated settings so frontend can use this data
       });
     } catch (error) {
       console.error("Error adding domain:", error);
@@ -930,18 +936,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Is primary domain: ${isPrimaryDomain}`);
       
-      // Special case: if the domain is being added for the first time, the DNS instructions window
-      // may still be open, but the domain might not be fully saved in settings yet
-      if (!isPrimaryDomain && domain === req.body.recentlyAddedDomain) {
-        console.log(`Special handling for recently added domain: ${domain}`);
-        isPrimaryDomain = true;
-        if (req.body.recentlyCnameTarget) {
-          cnameTarget = req.body.recentlyCnameTarget;
-        }
+      // If we received a recently added domain and CNAME target in the request, we should use those
+      // This handles the case where a user just added a domain and is checking verification
+      // before the database state is fully updated
+      if (recentlyAddedDomain && recentlyCnameTarget && domain === recentlyAddedDomain) {
+        console.log(`Using recently added domain data: ${recentlyAddedDomain} with target ${recentlyCnameTarget}`);
+        // Override all other checks - we'll use the recently added domain info
+        isPrimaryDomain = true; // Treat it as primary for simplicity
+        cnameTarget = recentlyCnameTarget;
       }
-      
-      // If not primary domain, look in additional domains
-      if (!isPrimaryDomain) {
+      // If it's not a primary domain or recently added domain, check additional domains
+      else if (!isPrimaryDomain) {
         try {
           const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
           domainInfo = additionalDomains.find((d: any) => d.domain === domain);
@@ -949,17 +954,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (domainInfo) {
             cnameTarget = domainInfo.cnameTarget;
           } else {
-            return res.status(400).json({
-              success: false,
-              message: "Domain not found in registered domains"
-            });
+            // If the domain wasn't found in the additional domains, but we have recent domain info,
+            // use that as a fallback
+            if (recentlyAddedDomain && recentlyCnameTarget) {
+              console.log(`Domain ${domain} not found in settings, but using recently added domain data`);
+              cnameTarget = recentlyCnameTarget;
+            } else {
+              return res.status(400).json({
+                success: false,
+                message: "Domain not found in registered domains"
+              });
+            }
           }
         } catch (err) {
           console.error("Error parsing additional domains during check:", err);
-          return res.status(500).json({
-            success: false,
-            message: "Error processing additional domains"
-          });
+          // Even if there's an error parsing, if we have recently added domain info, use that
+          if (recentlyAddedDomain && recentlyCnameTarget) {
+            console.log(`Error parsing additional domains, but using recently added domain data`);
+            cnameTarget = recentlyCnameTarget;
+          } else {
+            return res.status(500).json({
+              success: false,
+              message: "Error processing additional domains"
+            });
+          }
         }
       }
       
