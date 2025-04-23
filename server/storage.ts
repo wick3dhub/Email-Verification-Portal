@@ -25,7 +25,7 @@ export interface IStorage {
   getVerificationLinkByCode(code: string): Promise<VerificationLink | undefined>;
   getVerificationLinksByEmail(email: string): Promise<VerificationLink[]>;
   getAllVerificationLinks(): Promise<VerificationLink[]>;
-  updateVerificationLinkStatus(id: number, status: string, verifiedAt?: Date): Promise<VerificationLink | undefined>;
+  updateVerificationLinkStatus(id: number, status: string, verifiedAt?: Date, renewalRequested?: boolean): Promise<VerificationLink | undefined>;
   
   // Settings operations
   getSettings(): Promise<Setting | undefined>;
@@ -134,7 +134,8 @@ export class MemStorage implements IStorage {
       id,
       status: 'pending',
       createdAt: new Date(),
-      verifiedAt: null
+      verifiedAt: null,
+      renewalRequested: false
     };
     this.verificationLinks.set(id, verificationLink);
     return verificationLink;
@@ -156,13 +157,19 @@ export class MemStorage implements IStorage {
     return Array.from(this.verificationLinks.values());
   }
   
-  async updateVerificationLinkStatus(id: number, status: string, verifiedAt: Date | undefined = undefined): Promise<VerificationLink | undefined> {
+  async updateVerificationLinkStatus(
+    id: number, 
+    status: string, 
+    verifiedAt: Date | undefined = undefined,
+    renewalRequested: boolean | undefined = undefined
+  ): Promise<VerificationLink | undefined> {
     const verificationLink = this.verificationLinks.get(id);
     if (verificationLink) {
       const updatedLink: VerificationLink = {
         ...verificationLink,
         status,
-        verifiedAt: verifiedAt || verificationLink.verifiedAt
+        verifiedAt: verifiedAt || verificationLink.verifiedAt,
+        renewalRequested: renewalRequested !== undefined ? renewalRequested : verificationLink.renewalRequested || false
       };
       this.verificationLinks.set(id, updatedLink);
       return updatedLink;
@@ -328,7 +335,8 @@ export class DatabaseStorage implements IStorage {
         ...data,
         status: 'pending',
         createdAt: new Date(),
-        verifiedAt: null
+        verifiedAt: null,
+        renewalRequested: false
       })
       .returning();
     return link;
@@ -356,13 +364,25 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(verificationLinks.createdAt));
   }
   
-  async updateVerificationLinkStatus(id: number, status: string, verifiedAt?: Date): Promise<VerificationLink | undefined> {
+  async updateVerificationLinkStatus(
+    id: number, 
+    status: string, 
+    verifiedAt?: Date,
+    renewalRequested?: boolean
+  ): Promise<VerificationLink | undefined> {
+    const updateData: Partial<VerificationLink> = { 
+      status,
+      verifiedAt: verifiedAt || undefined
+    };
+
+    // Only add renewalRequested if it was provided
+    if (renewalRequested !== undefined) {
+      updateData.renewalRequested = renewalRequested;
+    }
+
     const [link] = await db
       .update(verificationLinks)
-      .set({ 
-        status, 
-        verifiedAt: verifiedAt || undefined 
-      })
+      .set(updateData)
       .where(eq(verificationLinks.id, id))
       .returning();
     return link || undefined;

@@ -25,7 +25,9 @@ import {
   Clock, 
   Calendar, 
   MailCheck,
-  AlertTriangle
+  AlertTriangle,
+  MailWarning,
+  SendHorizonal
 } from "lucide-react";
 
 export default function VerificationStatusTable() {
@@ -190,6 +192,18 @@ export default function VerificationStatusTable() {
     }
   };
   
+  // Get renewal requests links
+  const renewalRequests = data ? 
+    (data as VerificationLink[]).filter(link => link.renewalRequested) : [];
+
+  // New Renewal Handle function
+  const handleSendRenewal = (email: string) => {
+    handleResend(email);
+  };
+  
+  // Separate view tabs for all links vs renewal requests
+  const [mainTab, setMainTab] = useState<'all' | 'renewals'>('all');
+  
   return (
     <Card className="overflow-hidden">
       <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b">
@@ -201,12 +215,27 @@ export default function VerificationStatusTable() {
             </CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'sessions')}>
+            <Tabs value={mainTab} onValueChange={(value) => setMainTab(value as 'all' | 'renewals')}>
               <TabsList>
-                <TabsTrigger value="list">List View</TabsTrigger>
-                <TabsTrigger value="sessions">Sessions</TabsTrigger>
+                <TabsTrigger value="all">All Links</TabsTrigger>
+                <TabsTrigger value="renewals" className="relative">
+                  Renewal Requests
+                  {renewalRequests.length > 0 && (
+                    <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 text-[10px] flex items-center justify-center">
+                      {renewalRequests.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               </TabsList>
             </Tabs>
+            {mainTab === 'all' && (
+              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'sessions')}>
+                <TabsList>
+                  <TabsTrigger value="list">List View</TabsTrigger>
+                  <TabsTrigger value="sessions">Sessions</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
             <div className="flex items-center space-x-2">
               <Select onValueChange={(value) => handleClearCache(parseInt(value))}>
                 <SelectTrigger className="w-[180px]">
@@ -233,43 +262,137 @@ export default function VerificationStatusTable() {
       </CardHeader>
 
       <CardContent className="p-0">
-        {/* Filters and Search */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-          <div className="flex flex-col md:flex-row justify-between space-y-3 md:space-y-0 md:space-x-4">
-            <div className="w-full md:w-64">
-              <Select
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="verified">Verified</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full md:w-64">
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Search emails"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pr-10"
-                />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                  </svg>
+        {mainTab === 'renewals' ? (
+          // Renewal Requests Tab
+          <div>
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+              <div className="flex flex-col md:flex-row justify-between space-y-3 md:space-y-0 md:space-x-4">
+                <div className="text-sm text-gray-600">
+                  <AlertTriangle className="inline-block mr-2 h-4 w-4 text-amber-500" />
+                  These are links that users have requested to be renewed. Review and send new verification links.
+                </div>
+                <div className="w-full md:w-64">
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="Search renewal requests"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pr-10"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+            
+            {/* Renewal Requests Table */}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Requested Date</TableHead>
+                    <TableHead>Original Expiry</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {renewalRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6">
+                        <div className="flex flex-col items-center space-y-3 py-6 text-gray-500">
+                          <MailWarning className="h-10 w-10" />
+                          <p>No renewal requests found</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    renewalRequests
+                      .filter(link => !searchQuery || link.email.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map((link) => (
+                        <TableRow key={link.id} className="bg-amber-50 dark:bg-amber-900/10">
+                          <TableCell className="font-medium">
+                            {link.email}
+                          </TableCell>
+                          <TableCell><StatusBadge status={link.status} /></TableCell>
+                          <TableCell>{formatDate(link.createdAt)}</TableCell>
+                          <TableCell>{formatDate(link.expiresAt)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button 
+                              variant="default"
+                              size="sm"
+                              className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800"
+                              onClick={() => handleSendRenewal(link.email)}
+                              disabled={resendMutation.isPending}
+                            >
+                              {resendMutation.isPending ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  Sending...
+                                </>
+                              ) : (
+                                <>
+                                  <SendHorizonal className="h-4 w-4 mr-1" />
+                                  Send Renewal
+                                </>
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
+        ) : (
+          // Regular All Links Tab
+          <>
+            {/* Filters and Search */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+              <div className="flex flex-col md:flex-row justify-between space-y-3 md:space-y-0 md:space-x-4">
+                <div className="w-full md:w-64">
+                  <Select
+                    value={statusFilter}
+                    onValueChange={setStatusFilter}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="verified">Verified</SelectItem>
+                      <SelectItem value="expired">Expired</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-full md:w-64">
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="Search emails"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pr-10"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Session View */}
         {viewMode === 'sessions' && Array.isArray(data) && !('id' in data[0]) ? (

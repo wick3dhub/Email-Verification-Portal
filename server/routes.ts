@@ -262,28 +262,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Create a new verification link with the same email
-      const domain = await getVerificationDomain(req, 'default');
+      // Mark the link as having a renewal requested
+      await storage.updateVerificationLinkStatus(verificationLink.id, verificationLink.status, undefined, true);
       
-      // Generate secure code for the new link
-      const newCode = await storage.generateVerificationCode();
-      
-      const newLink = await storage.createVerificationLink({
-        email: email,
-        code: newCode,
-        status: 'pending',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      // Return success - admin will need to review and send the renewal
+      return res.status(200).json({
+        success: true,
+        message: "Your renewal request has been received. You will receive a new verification link shortly."
       });
       
-      // Generate the full verification URL with the domain
-      const verificationUrl = `${domain}/verify/${newLink.code}`;
-      
-      // Return success response
-      res.status(200).json({ 
-        success: true, 
-        message: "Verification link renewed successfully",
-        renewedLinkId: newLink.id
-      });
+      /* NOTE: We're no longer auto-creating a new link here as per requirements.
+         Instead, we mark the existing link as having a renewal requested, 
+         and the admin will need to review and manually send the renewal using the admin interface */
       
     } catch (error) {
       console.error("Error renewing verification link:", error);
