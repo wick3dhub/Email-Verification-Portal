@@ -34,6 +34,7 @@ export async function setupAuth(app: Express, pool: Pool) {
         secure: process.env.NODE_ENV === "production", // Use secure cookies in production
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+        sameSite: 'lax', // Add SameSite attribute
       },
     })
   );
@@ -84,12 +85,20 @@ export async function setupAuth(app: Express, pool: Pool) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      // Set user ID in session
+      // Set user ID in session and save it
       req.session.userId = user.id;
       
-      return res.status(200).json({
-        id: user.id,
-        username: user.username,
+      // Make sure session is saved before responding
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ message: "Error during login" });
+        }
+        
+        return res.status(200).json({
+          id: user.id,
+          username: user.username,
+        });
       });
     } catch (error) {
       console.error("Login error:", error);
