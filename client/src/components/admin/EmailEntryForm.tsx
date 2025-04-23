@@ -23,6 +23,7 @@ const emailBatchSchema = z.object({
     .int()
     .min(1, "Expiration days must be at least 1")
     .default(7),
+  redirectUrl: z.string().url("Please enter a valid URL").optional(),
 });
 
 type EmailBatchFormValues = z.infer<typeof emailBatchSchema>;
@@ -78,8 +79,16 @@ export default function EmailEntryForm() {
     defaultValues: {
       emails: "",
       expireDays: 7,
+      redirectUrl: "",
     },
   });
+  
+  // Update redirectUrl default when settings change
+  useEffect(() => {
+    if (settings?.redirectUrl) {
+      form.setValue("redirectUrl", settings.redirectUrl);
+    }
+  }, [settings, form]);
 
   const generateMutation = useMutation({
     mutationFn: async (values: EmailBatchFormValues) => {
@@ -87,6 +96,7 @@ export default function EmailEntryForm() {
         emails: values.emails,
         expireDays: values.expireDays,
         domain: selectedDomain, // Add selected domain to the request
+        redirectUrl: values.redirectUrl, // Add custom redirect URL
       });
       return res.json();
     },
