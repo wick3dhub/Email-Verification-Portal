@@ -723,19 +723,32 @@ export default function SettingsForm() {
                             {domainsArray.length > 0 ? (
                               <div className="border rounded-md">
                                 <ul className="divide-y">
-                                  {domainsArray.map((domain: string, index: number) => (
-                                    <li key={index} className="flex items-center justify-between p-3">
-                                      <span className="text-sm">{domain}</span>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removeDomain(domain)}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </li>
-                                  ))}
+                                  {domainsArray.map((domain: any, index: number) => {
+                                    // Handle both string and object formats
+                                    const domainValue = typeof domain === 'string' ? domain : domain.domain;
+                                    const isVerified = typeof domain === 'object' && domain.verified;
+                                    
+                                    return (
+                                      <li key={index} className="flex items-center justify-between p-3">
+                                        <div className="flex items-center space-x-2">
+                                          <span className="text-sm">{domainValue}</span>
+                                          {typeof domain === 'object' && (
+                                            <div className={`px-2 py-0.5 rounded-full text-xs ${isVerified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                              {isVerified ? 'Verified' : 'Pending'}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeDomain(domainValue)}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </li>
+                                    );
+                                  })}
                                 </ul>
                               </div>
                             ) : (
