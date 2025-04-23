@@ -16,6 +16,135 @@ interface DomainInfo {
   verified: boolean;
 }
 
+/**
+ * Background verification for domains
+ * Attempts to verify a domain's CNAME record repeatedly without blocking the user
+ * @param domain Domain to verify
+ * @param cnameTarget Expected CNAME target value
+ * @param attempts Current attempt count (used for recursion)
+ * @param maxAttempts Maximum number of verification attempts
+ * @param delayMs Delay between verification attempts in milliseconds
+ */
+async function verifyDomainInBackground(
+  domain: string, 
+  cnameTarget: string, 
+  attempts: number = 0, 
+  maxAttempts: number = 30, 
+  delayMs: number = 20000 // Default 20s between attempts
+) {
+  // Skip if reached max attempts
+  if (attempts >= maxAttempts) {
+    console.log(`Maximum verification attempts (${maxAttempts}) reached for domain: ${domain}`);
+    return;
+  }
+  
+  console.log(`[Background Verification] Checking domain ${domain} (attempt ${attempts + 1}/${maxAttempts})`);
+  
+  try {
+    const settings = await storage.getSettings();
+    if (!settings) {
+      console.error("Settings not found during background verification");
+      return;
+    }
+    
+    // Check if we're verifying primary domain or an additional domain
+    let isPrimaryDomain = settings.customDomain === domain;
+    let additionalDomains: any[] = [];
+    
+    try {
+      additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+    } catch (err) {
+      console.error("Error parsing additional domains during verification:", err);
+      additionalDomains = [];
+    }
+    
+    // If it's not the primary domain, find it in the additional domains
+    if (!isPrimaryDomain) {
+      const domainInfo = additionalDomains.find(d => d.domain === domain);
+      if (!domainInfo) {
+        console.error(`Domain ${domain} not found in settings during verification`);
+        return;
+      }
+      
+      // If domain is already verified, no need to continue
+      if (domainInfo.verified) {
+        console.log(`Domain ${domain} is already verified`);
+        return;
+      }
+    } else if (settings.domainVerified) {
+      // Primary domain is already verified
+      console.log(`Primary domain ${domain} is already verified`);
+      return;
+    }
+    
+    // Use DNS module to check CNAME record
+    const dns = await import('dns');
+    const util = await import('util');
+    const resolveCname = util.promisify(dns.resolveCname);
+    
+    try {
+      // Check if CNAME record has been configured correctly
+      const cnameRecords = await resolveCname(domain);
+      
+      let verified = false;
+      if (cnameRecords && cnameRecords.length > 0) {
+        // Check if any of the CNAME records match our target
+        verified = cnameRecords.some(record => 
+          record === cnameTarget || 
+          record.endsWith(cnameTarget)
+        );
+      }
+      
+      if (verified) {
+        console.log(`[Background Verification] Domain ${domain} verified successfully!`);
+        
+        // Update verification status
+        if (isPrimaryDomain) {
+          // Update primary domain status
+          await storage.updateSettings({
+            domainVerified: true
+          });
+        } else {
+          // Update additional domain status
+          const updatedDomains = additionalDomains.map(d => {
+            if (d.domain === domain) {
+              return {
+                ...d,
+                verified: true,
+                verifiedAt: new Date().toISOString()
+              };
+            }
+            return d;
+          });
+          
+          await storage.updateSettings({
+            additionalDomains: JSON.stringify(updatedDomains)
+          });
+        }
+        return; // Successfully verified, exit the function
+      }
+    } catch (dnsError) {
+      // DNS error - CNAME not found or still propagating
+      console.log(`[Background Verification] DNS error for ${domain}: ${dnsError.message}`);
+    }
+    
+    // Schedule next verification attempt with exponential backoff
+    const nextDelay = Math.min(delayMs * 1.5, 300000); // Cap at 5 minutes
+    console.log(`[Background Verification] Will try again in ${nextDelay / 1000}s`);
+    
+    setTimeout(() => {
+      verifyDomainInBackground(domain, cnameTarget, attempts + 1, maxAttempts, nextDelay);
+    }, delayMs);
+  } catch (error) {
+    console.error(`[Background Verification] Error verifying domain ${domain}:`, error);
+    
+    // Continue with retry despite error
+    setTimeout(() => {
+      verifyDomainInBackground(domain, cnameTarget, attempts + 1, maxAttempts, delayMs);
+    }, delayMs);
+  }
+}
+
 // Helper function to determine the appropriate domain for verification links
 async function getVerificationDomain(req: Request, domainOption: string = 'default'): Promise<string> {
   try {
@@ -604,13 +733,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate a random CNAME target
       const cnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
       
-      // Update settings with new domain (unverified initially)
-      const updatedSettings = await storage.updateSettings({
-        customDomain: domain,
-        domainCnameTarget: cnameTarget,
-        domainVerified: false,
-        useCustomDomain: true
-      });
+      // Check if this is the first domain being added
+      if (!settings.customDomain || settings.customDomain === '') {
+        // Update settings with new domain as the primary domain (unverified initially)
+        await storage.updateSettings({
+          customDomain: domain,
+          domainCnameTarget: cnameTarget,
+          domainVerified: false,
+          useCustomDomain: true
+        });
+      } else {
+        // Add as an additional domain
+        let additionalDomains = [];
+        try {
+          additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+        } catch (err) {
+          console.error("Error parsing additional domains:", err);
+          additionalDomains = [];
+        }
+        
+        // Check if domain already exists in additional domains
+        const existingDomainIndex = additionalDomains.findIndex(
+          d => typeof d === 'object' && d.domain === domain
+        );
+        
+        if (existingDomainIndex >= 0) {
+          // Update existing domain record
+          additionalDomains[existingDomainIndex] = {
+            domain,
+            cnameTarget,
+            verified: false,
+            addedAt: new Date().toISOString()
+          };
+        } else {
+          // Add new domain record
+          additionalDomains.push({
+            domain,
+            cnameTarget,
+            verified: false,
+            addedAt: new Date().toISOString()
+          });
+        }
+        
+        // Update settings with additional domains
+        await storage.updateSettings({
+          additionalDomains: JSON.stringify(additionalDomains),
+          useCustomDomain: true // Make sure custom domains are enabled
+        });
+      }
+      
+      // Start background verification process
+      // This will check the domain periodically without blocking the user
+      setTimeout(() => {
+        verifyDomainInBackground(domain, cnameTarget);
+      }, 100);
       
       // Return success with CNAME information for admin to configure
       return res.status(200).json({
@@ -619,7 +795,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         domain: domain,
         cnameTarget: cnameTarget,
         instructions: `Create a CNAME record pointing from ${domain} to ${cnameTarget}`,
-        settings: updatedSettings
+        verificationStatus: "pending",
+        note: "Domain verification will happen automatically in the background. You can continue adding more domains."
       });
     } catch (error) {
       console.error("Error adding domain:", error);
