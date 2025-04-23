@@ -263,7 +263,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Mark the link as having a renewal requested
-      await storage.updateVerificationLinkStatus(verificationLink.id, verificationLink.status, undefined, true);
+      await storage.updateVerificationLinkStatus(
+        verificationLink.id, 
+        verificationLink.status, 
+        undefined, 
+        true
+      );
       
       // Return success - admin will need to review and send the renewal
       return res.status(200).json({

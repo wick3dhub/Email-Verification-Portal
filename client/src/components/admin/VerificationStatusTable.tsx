@@ -194,7 +194,7 @@ export default function VerificationStatusTable() {
   
   // Get renewal requests links
   const renewalRequests = data ? 
-    (data as VerificationLink[]).filter(link => link.renewalRequested) : [];
+    (data as VerificationLink[]).filter(link => link.renewalRequested === true) : [];
 
   // New Renewal Handle function
   const handleSendRenewal = (email: string) => {

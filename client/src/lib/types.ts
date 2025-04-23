@@ -6,6 +6,7 @@ export interface VerificationLink {
   createdAt: string | Date;
   expiresAt: string | Date;
   verifiedAt: string | Date | null;
+  renewalRequested?: boolean;
   url?: string;
 }
 
