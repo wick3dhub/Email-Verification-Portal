@@ -1475,6 +1475,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get domain option (default, random, or specific domain)
       const domainOption = req.body.domain || 'default';
       
+      // Get custom redirect URL if provided
+      const redirectUrl = req.body.redirectUrl;
+      
       // Read the file
       const fileContent = fs.readFileSync(req.file.path, 'utf8');
       
@@ -1515,7 +1518,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const verificationLink = await storage.createVerificationLink({
             email,
             code,
-            expiresAt
+            expiresAt,
+            redirectUrl // Include custom redirectUrl if provided
           });
           
           // Get domain for verification link using the selected domain option

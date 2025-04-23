@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -152,7 +152,7 @@ export default function EmailEntryForm() {
   });
 
   const fileUploadMutation = useMutation({
-    mutationFn: async ({ file, expireDays }: { file: File, expireDays: number }) => {
+    mutationFn: async ({ file, expireDays, redirectUrl }: { file: File, expireDays: number, redirectUrl?: string }) => {
       setUploadProgress(0);
       
       // Create FormData to send the file
@@ -160,6 +160,9 @@ export default function EmailEntryForm() {
       formData.append('file', file);
       formData.append('expireDays', expireDays.toString());
       formData.append('domain', selectedDomain);
+      if (redirectUrl) {
+        formData.append('redirectUrl', redirectUrl);
+      }
       
       // Create a custom fetch with progress tracking
       const xhr = new XMLHttpRequest();
@@ -229,11 +232,11 @@ export default function EmailEntryForm() {
     
     setUploadFileName(file.name);
     
-    // Get expiration days from the form
-    const expireDays = form.getValues().expireDays;
+    // Get values from the form
+    const { expireDays, redirectUrl } = form.getValues();
     
     // Upload the file
-    fileUploadMutation.mutate({ file, expireDays });
+    fileUploadMutation.mutate({ file, expireDays, redirectUrl });
   };
 
   const handleChooseFile = () => {
@@ -331,6 +334,29 @@ export default function EmailEntryForm() {
                     )}
                   />
                   
+                  {/* Custom Redirect URL */}
+                  <FormField
+                    control={form.control}
+                    name="redirectUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Custom Redirect URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="https://example.com/thank-you" 
+                            {...field} 
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Override the default redirect URL for this batch of links only. 
+                          Leave empty to use the global redirect URL from settings.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
                   {/* Domain Selection */}
                   <div className="space-y-2">
                     <FormLabel>Domain for Verification Links</FormLabel>
@@ -402,6 +428,29 @@ export default function EmailEntryForm() {
                     )}
                   />
                   
+                  {/* Custom Redirect URL for File Upload */}
+                  <FormField
+                    control={form.control}
+                    name="redirectUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Custom Redirect URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="https://example.com/thank-you" 
+                            {...field} 
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Override the default redirect URL for this batch of links only. 
+                          Leave empty to use the global redirect URL from settings.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                
                   {/* Domain Selection for File Upload */}
                   <div className="space-y-2">
                     <FormLabel>Domain for Verification Links</FormLabel>
