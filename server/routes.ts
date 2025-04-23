@@ -151,13 +151,72 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
     const settings = await storage.getSettings();
     const defaultDomain = req.get('host') || 'localhost:5000';
     
-    // If custom domains are not enabled or the domain is not verified, use default
-    if (!settings?.useCustomDomain || !settings.customDomain || !settings.domainVerified) {
+    // If custom domains are disabled, return default domain
+    if (!settings?.useCustomDomain) {
       return defaultDomain;
     }
     
-    // If custom domain is enabled and verified, use it
-    return settings.customDomain;
+    // Handle special domain options
+    if (domainOption === 'default') {
+      // For default option, use primary domain if verified
+      if (settings.customDomain && settings.domainVerified) {
+        return settings.customDomain;
+      }
+      return defaultDomain;
+    } 
+    
+    // Check for specific domain request
+    if (domainOption !== 'random' && domainOption !== 'default') {
+      // User is requesting a specific domain - check if we have it
+      if (domainOption === settings.customDomain && settings.domainVerified) {
+        return settings.customDomain;
+      }
+      
+      // Check additional domains
+      try {
+        const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+        const requestedDomain = additionalDomains.find((d: any) => 
+          d.domain === domainOption && d.verified === true
+        );
+        
+        if (requestedDomain) {
+          return requestedDomain.domain;
+        }
+      } catch (err) {
+        console.error("Error parsing additional domains for domain selection:", err);
+      }
+    }
+    
+    // For random option or if specific domain wasn't found, get a random verified domain
+    if (domainOption === 'random' || domainOption !== 'default') {
+      const verifiedDomains = [];
+      
+      // Add primary domain if verified
+      if (settings.customDomain && settings.domainVerified) {
+        verifiedDomains.push(settings.customDomain);
+      }
+      
+      // Add verified additional domains
+      try {
+        const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+        for (const domain of additionalDomains) {
+          if (domain.verified === true) {
+            verifiedDomains.push(domain.domain);
+          }
+        }
+      } catch (err) {
+        console.error("Error parsing additional domains for random selection:", err);
+      }
+      
+      // If we have verified domains, pick a random one
+      if (verifiedDomains.length > 0) {
+        const randomIndex = Math.floor(Math.random() * verifiedDomains.length);
+        return verifiedDomains[randomIndex];
+      }
+    }
+    
+    // Fallback to default if no suitable domain found
+    return defaultDomain;
   } catch (error) {
     console.error("Error getting verification domain:", error);
     // Fallback to request host

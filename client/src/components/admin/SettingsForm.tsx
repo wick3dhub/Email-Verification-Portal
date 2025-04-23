@@ -616,14 +616,14 @@ export default function SettingsForm() {
                           <div className="flex items-center space-x-2">
                             <Input
                               readOnly
-                              value={field.value}
+                              value={field.value || ""}
                               className="bg-gray-50"
                             />
                             <Button
                               type="button"
                               variant="outline"
                               onClick={() => {
-                                navigator.clipboard.writeText(field.value);
+                                navigator.clipboard.writeText(field.value || "");
                                 toast({
                                   title: "CNAME copied",
                                   description: "CNAME target copied to clipboard",
