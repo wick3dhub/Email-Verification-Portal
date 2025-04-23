@@ -58,9 +58,21 @@ async function verifyDomainInBackground(
       additionalDomains = [];
     }
     
+    // Log the current settings state to help debug
+    console.log(`[Background Verification] Primary domain: ${settings.customDomain}, Checking: ${domain}`);
+    console.log(`[Background Verification] Additional domains: ${settings.additionalDomains}`);
+    
     // If it's not the primary domain, find it in the additional domains
     if (!isPrimaryDomain) {
-      const domainInfo = additionalDomains.find(d => d.domain === domain);
+      // Print what we're looking for
+      console.log(`[Background Verification] Looking for ${domain} in additional domains`);
+      
+      // Check each domain in the additionalDomains array
+      const domainInfo = additionalDomains.find(d => {
+        console.log(`[Background Verification] Comparing with: ${JSON.stringify(d)}`);
+        return d && typeof d === 'object' && d.domain === domain;
+      });
+      
       if (!domainInfo) {
         console.error(`Domain ${domain} not found in settings during verification`);
         return;
@@ -795,12 +807,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if this is the first domain being added
       if (!settings.customDomain || settings.customDomain === '') {
         // Update settings with new domain as the primary domain (unverified initially)
+        // Update the settings immediately with the domain
         await storage.updateSettings({
           customDomain: domain,
           domainCnameTarget: cnameTarget,
           domainVerified: false,
           useCustomDomain: true
         });
+        
+        // Double-check that domain was stored properly by getting settings again
+        const afterUpdate = await storage.getSettings();
+        console.log(`Primary domain set to: ${afterUpdate?.customDomain}`);
       } else {
         // Add as an additional domain
         let additionalDomains = [];
@@ -839,6 +856,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           additionalDomains: JSON.stringify(additionalDomains),
           useCustomDomain: true // Make sure custom domains are enabled
         });
+        
+        // Double-check that additional domains were stored properly
+        const afterUpdate = await storage.getSettings();
+        console.log(`Additional domains updated: ${afterUpdate?.additionalDomains}`);
       }
       
       // Return updated settings
