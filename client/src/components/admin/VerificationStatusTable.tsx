@@ -33,11 +33,10 @@ import {
 export default function VerificationStatusTable() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [viewMode, setViewMode] = useState<'list' | 'sessions'>('list');
+  const [mainTab, setMainTab] = useState<'all' | 'renewals'>('all');
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  // State for view mode: 'list' (traditional) or 'sessions' (grouped by session date)
-  const [viewMode, setViewMode] = useState<'list' | 'sessions'>('list');
   
   // Fetch verification links with grouping by session if needed
   const { data, isLoading, error, refetch } = useQuery({
@@ -200,9 +199,6 @@ export default function VerificationStatusTable() {
   const handleSendRenewal = (email: string) => {
     handleResend(email);
   };
-  
-  // Separate view tabs for all links vs renewal requests
-  const [mainTab, setMainTab] = useState<'all' | 'renewals'>('all');
   
   return (
     <Card className="overflow-hidden">
