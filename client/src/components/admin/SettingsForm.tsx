@@ -12,7 +12,23 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Loader2, X } from "lucide-react";
+import { 
+  Loader2, 
+  X, 
+  CircleCheck, 
+  CircleAlert, 
+  Globe, 
+  ArrowRight, 
+  RefreshCw 
+} from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+
+// DNS instructions state
+interface DnsInstructionsState {
+  domain: string;
+  cnameTarget: string;
+  showInstructions: boolean;
+}
 
 const settingsSchema = z.object({
   redirectUrl: z.string().url("Please enter a valid URL"),
@@ -68,6 +84,16 @@ type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 export default function SettingsForm() {
   const { toast } = useToast();
+  
+  // State for DNS instructions
+  const [dnsInstructions, setDnsInstructions] = useState<DnsInstructionsState>({
+    domain: '',
+    cnameTarget: '',
+    showInstructions: false
+  });
+  
+  // Interval for checking domain verification
+  const [checkingDomain, setCheckingDomain] = useState(false);
 
   // Fetch current settings
   const { data: settings, isLoading, error } = useQuery<Settings>({
@@ -550,7 +576,8 @@ export default function SettingsForm() {
                           return;
                         }
                         
-                        const res = await apiRequest("POST", "/api/domain/verify", { 
+                        // Step 1: Add the domain to get a CNAME target
+                        const res = await apiRequest("POST", "/api/domain/add", { 
                           domain
                         });
                         
@@ -561,27 +588,35 @@ export default function SettingsForm() {
                           if (data.settings) {
                             form.setValue('domainVerified', data.settings.domainVerified);
                             form.setValue('domainCnameTarget', data.settings.domainCnameTarget);
+                            form.setValue('useCustomDomain', true);
                           }
                           
                           toast({
-                            title: "Domain verified",
-                            description: "Your domain has been successfully verified. Use the provided CNAME record to point your domain.",
+                            title: "Domain added",
+                            description: `Add this CNAME record to your DNS: ${domain} → ${data.cnameTarget}`,
                           });
                           
                           // Refresh settings data
                           queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+                          
+                          // Show configuration instructions
+                          setDnsInstructions({
+                            domain: domain,
+                            cnameTarget: data.cnameTarget,
+                            showInstructions: true
+                          });
                         } else {
                           toast({
-                            title: "Verification failed",
-                            description: data.message || "Unable to verify domain",
+                            title: "Failed to add domain",
+                            description: data.message || "Unable to add domain",
                             variant: "destructive",
                           });
                         }
                       } catch (error) {
-                        console.error("Domain verification error:", error);
+                        console.error("Domain error:", error);
                         toast({
-                          title: "Verification error",
-                          description: "An error occurred during domain verification. Please try again.",
+                          title: "Error",
+                          description: "An error occurred while adding the domain. Please try again.",
                           variant: "destructive",
                         });
                       }

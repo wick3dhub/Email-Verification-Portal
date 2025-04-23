@@ -576,7 +576,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
 
 
-  app.post("/api/domain/verify", async (req: Request, res: Response) => {
+  // Add domain endpoint - adds the domain and generates a CNAME target
+  app.post("/api/domain/add", async (req: Request, res: Response) => {
+    try {
+      const { domain } = req.body;
+      
+      if (!domain) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Domain is required" 
+        });
+      }
+      
+      // Simple domain validation
+      if (!domain.match(/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid domain format"
+        });
+      }
+      
+      // Get existing settings
+      const settings = await storage.getSettings();
+      
+      if (!settings) {
+        return res.status(404).json({ 
+          success: false,
+          message: "Settings not found" 
+        });
+      }
+      
+      // Generate a random CNAME target
+      const cnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
+      
+      // Update settings with new domain (unverified initially)
+      const updatedSettings = await storage.updateSettings({
+        customDomain: domain,
+        domainCnameTarget: cnameTarget,
+        domainVerified: false,
+        useCustomDomain: true
+      });
+      
+      // Return success with CNAME information for admin to configure
+      return res.status(200).json({
+        success: true,
+        message: "Domain added successfully. Please configure the CNAME record as shown below.",
+        domain: domain,
+        cnameTarget: cnameTarget,
+        instructions: `Create a CNAME record pointing from ${domain} to ${cnameTarget}`,
+        settings: updatedSettings
+      });
+    } catch (error) {
+      console.error("Error adding domain:", error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Failed to add domain. Please try again later."
+      });
+    }
+  });
+  
+  // Check domain verification status
+  app.post("/api/domain/check", async (req: Request, res: Response) => {
     try {
       const { domain } = req.body;
       
@@ -597,63 +657,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Generate a CNAME target if one doesn't exist
-      let cnameTarget = settings.domainCnameTarget;
-      if (!cnameTarget) {
-        cnameTarget = `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
-      }
-      
-      try {
-        // Import our DNS verification utility
-        const { verifyDomain } = require('./utils/dnsVerifier');
-        
-        // Configure verification options
-        const verificationOptions = {
-          maxRetries: 3,       // Number of retries for DNS lookups
-          retryDelay: 2000,    // Initial delay between retries (will increase with exponential backoff)
-          timeoutMs: 5000      // Timeout for each DNS lookup attempt
-        };
-        
-        // Perform domain verification (checks CNAME record)
-        const dnsResult = await verifyDomain(domain, cnameTarget, verificationOptions);
-        
-        if (!dnsResult.success) {
-          return res.status(400).json({
-            success: false,
-            message: `CNAME verification failed. Please set a CNAME record for ${domain} pointing to ${cnameTarget}`,
-            cnameTarget: cnameTarget
-          });
-        }
-        
-        // Log success for monitoring purposes
-        console.log(`Domain ${domain} successfully verified with target ${cnameTarget}`);
-        
-        // Update domain verification settings
-        const updatedSettings = await storage.updateSettings({
-          customDomain: domain,
-          domainCnameTarget: cnameTarget,
-          domainVerified: true
-        });
-        
-        return res.status(200).json({
-          success: true,
-          message: "Domain verified successfully",
-          cnameTarget: cnameTarget,
-          settings: updatedSettings
-        });
-      } catch (dnsError) {
-        console.error("DNS verification error:", dnsError);
+      // Make sure this is the domain we have on record
+      if (settings.customDomain !== domain) {
         return res.status(400).json({
           success: false,
-          message: `Could not verify CNAME record. Ensure a CNAME record for ${domain} is set to ${cnameTarget}`,
+          message: "Domain doesn't match the registered domain"
+        });
+      }
+      
+      const cnameTarget = settings.domainCnameTarget;
+      if (!cnameTarget) {
+        return res.status(400).json({
+          success: false,
+          message: "No CNAME target found for this domain"
+        });
+      }
+      
+      // Use Node's DNS module directly instead of the dnsVerifier utility
+      const dns = await import('dns');
+      const util = await import('util');
+      const resolveCname = util.promisify(dns.resolveCname);
+      
+      try {
+        // Check if CNAME record has been configured correctly
+        const cnameRecords = await resolveCname(domain);
+        
+        let verified = false;
+        if (cnameRecords && cnameRecords.length > 0) {
+          // Check if any of the CNAME records match our target
+          verified = cnameRecords.some(record => 
+            record === cnameTarget || 
+            record.endsWith(cnameTarget)
+          );
+        }
+        
+        if (verified) {
+          // Domain verified successfully
+          const updatedSettings = await storage.updateSettings({
+            domainVerified: true
+          });
+          
+          return res.status(200).json({
+            success: true,
+            message: "Domain verified successfully",
+            verified: true,
+            cnameTarget: cnameTarget,
+            settings: updatedSettings
+          });
+        } else {
+          // CNAME configured but doesn't match
+          return res.status(202).json({
+            success: true,
+            message: "CNAME record found but doesn't match the expected target",
+            verified: false,
+            cnameTarget: cnameTarget,
+            found: cnameRecords || []
+          });
+        }
+      } catch (dnsError) {
+        // CNAME not found or DNS error
+        return res.status(202).json({
+          success: true,
+          message: "CNAME record not found or still propagating",
+          verified: false,
           cnameTarget: cnameTarget
         });
       }
     } catch (error) {
-      console.error("Error verifying domain:", error);
+      console.error("Error checking domain:", error);
       return res.status(500).json({ 
         success: false,
-        message: "Failed to verify domain. Please try again later."
+        message: "Failed to check domain verification. Please try again later."
       });
     }
   });
