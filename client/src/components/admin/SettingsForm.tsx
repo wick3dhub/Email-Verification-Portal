@@ -111,6 +111,8 @@ export default function SettingsForm() {
       });
       const data = await res.json();
       
+      console.log("Domain verification check response:", data);
+      
       if (data.success && data.verified) {
         // Domain is verified
         form.setValue('domainVerified', true);
@@ -128,11 +130,31 @@ export default function SettingsForm() {
         // Refresh settings data
         queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
         return true;
+      } else if (data.success) {
+        // Domain is not verified yet, but check was successful
+        toast({
+          title: "Verification in progress",
+          description: data.message || "CNAME record not found or still propagating. This can take 1-24 hours depending on your DNS provider."
+        });
+        return false;
+      } else if (!data.success) {
+        // Something went wrong with the check
+        toast({
+          title: "Verification check failed",
+          description: data.message || "There was a problem checking domain verification status.",
+          variant: "destructive"
+        });
+        return false;
       }
       
       return false;
     } catch (error) {
       console.error("Error checking domain:", error);
+      toast({
+        title: "Error checking domain",
+        description: error instanceof Error ? error.message : "An error occurred while checking domain verification.",
+        variant: "destructive"
+      });
       return false;
     }
   };
@@ -673,15 +695,18 @@ export default function SettingsForm() {
                         }
                         
                         // Step 1: Add the domain to get a CNAME target
+                        console.log(`Adding domain: ${domain}`);
                         const res = await apiRequest("POST", "/api/domain/add", { 
                           domain
                         });
                         
                         const data = await res.json();
+                        console.log("Domain add response:", data);
                         
                         if (data.success) {
                           // Update form values with the response
                           if (data.settings) {
+                            console.log("Updated settings received:", data.settings);
                             form.setValue('domainVerified', data.settings.domainVerified);
                             form.setValue('domainCnameTarget', data.settings.domainCnameTarget);
                             form.setValue('useCustomDomain', true);
@@ -703,6 +728,8 @@ export default function SettingsForm() {
                             cnameTarget: data.cnameTarget,
                             showInstructions: true
                           });
+                          
+                          console.log(`DNS instructions set with domain: ${domain} and CNAME target: ${data.cnameTarget}`);
                           
                           // Start checking the domain in the background
                           startDomainVerificationCheck(domain);
