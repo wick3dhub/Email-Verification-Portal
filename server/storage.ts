@@ -151,7 +151,8 @@ export class MemStorage implements IStorage {
       status: 'pending',
       createdAt: new Date(),
       verifiedAt: null,
-      renewalRequested: false
+      renewalRequested: false,
+      redirectUrl: data.redirectUrl || null
     };
     this.verificationLinks.set(id, verificationLink);
     return verificationLink;
@@ -366,7 +367,8 @@ export class DatabaseStorage implements IStorage {
         status: 'pending',
         createdAt: new Date(),
         verifiedAt: null,
-        renewalRequested: false
+        renewalRequested: false,
+        redirectUrl: data.redirectUrl || null
       })
       .returning();
     return link;

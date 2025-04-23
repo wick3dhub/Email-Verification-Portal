@@ -22,6 +22,7 @@ export const verificationLinks = pgTable("verification_links", {
   expiresAt: timestamp("expires_at").notNull(),
   verifiedAt: timestamp("verified_at"),
   renewalRequested: boolean("renewal_requested").notNull().default(false),
+  redirectUrl: text("redirect_url"), // Store redirect URL for each link
 });
 
 export const insertVerificationLinkSchema = createInsertSchema(verificationLinks).pick({
@@ -29,6 +30,7 @@ export const insertVerificationLinkSchema = createInsertSchema(verificationLinks
   code: true,
   status: true,
   expiresAt: true,
+  redirectUrl: true,
 });
 
 export const settings = pgTable("settings", {
