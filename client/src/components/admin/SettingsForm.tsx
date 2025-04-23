@@ -604,41 +604,44 @@ export default function SettingsForm() {
                   )}
                 />
                 
-                <FormField
-                  control={form.control}
-                  name="domainCnameTarget"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CNAME Record</FormLabel>
-                      <FormControl>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            readOnly
-                            value={field.value || "wick3d-links.replit.app"}
-                            className="bg-gray-50"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              navigator.clipboard.writeText(field.value || "wick3d-links.replit.app");
-                              toast({
-                                title: "CNAME copied",
-                                description: "CNAME target copied to clipboard",
-                              });
-                            }}
-                          >
-                            Copy
-                          </Button>
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Create a CNAME record for your domain pointing to this value
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Only show CNAME Record field if a domain has been added and there's a CNAME target */}
+                {form.watch('customDomain') && form.watch('domainCnameTarget') && (
+                  <FormField
+                    control={form.control}
+                    name="domainCnameTarget"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CNAME Record</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              readOnly
+                              value={field.value}
+                              className="bg-gray-50"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                navigator.clipboard.writeText(field.value);
+                                toast({
+                                  title: "CNAME copied",
+                                  description: "CNAME target copied to clipboard",
+                                });
+                              }}
+                            >
+                              Copy
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Create a CNAME record for your domain pointing to this value
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 
                 <FormField
                   control={form.control}

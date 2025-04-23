@@ -123,7 +123,7 @@ async function verifyDomainInBackground(
         }
         return; // Successfully verified, exit the function
       }
-    } catch (dnsError) {
+    } catch (dnsError: any) {
       // DNS error - CNAME not found or still propagating
       console.log(`[Background Verification] DNS error for ${domain}: ${dnsError.message}`);
     }
@@ -754,7 +754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check if domain already exists in additional domains
         const existingDomainIndex = additionalDomains.findIndex(
-          d => typeof d === 'object' && d.domain === domain
+          (d: any) => typeof d === 'object' && d.domain === domain
         );
         
         if (existingDomainIndex >= 0) {
@@ -785,6 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Start background verification process
       // This will check the domain periodically without blocking the user
       setTimeout(() => {
+        // Verify the domain without blocking
         verifyDomainInBackground(domain, cnameTarget);
       }, 100);
       
@@ -829,15 +830,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Make sure this is the domain we have on record
-      if (settings.customDomain !== domain) {
-        return res.status(400).json({
-          success: false,
-          message: "Domain doesn't match the registered domain"
-        });
+      // Determine whether this is the primary domain or an additional domain
+      let isPrimaryDomain = settings.customDomain === domain;
+      let cnameTarget = settings.domainCnameTarget;
+      let domainInfo: any = null;
+      
+      // If not primary domain, look in additional domains
+      if (!isPrimaryDomain) {
+        try {
+          const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+          domainInfo = additionalDomains.find((d: any) => d.domain === domain);
+          
+          if (domainInfo) {
+            cnameTarget = domainInfo.cnameTarget;
+          } else {
+            return res.status(400).json({
+              success: false,
+              message: "Domain not found in registered domains"
+            });
+          }
+        } catch (err) {
+          console.error("Error parsing additional domains during check:", err);
+          return res.status(500).json({
+            success: false,
+            message: "Error processing additional domains"
+          });
+        }
       }
       
-      const cnameTarget = settings.domainCnameTarget;
       if (!cnameTarget) {
         return res.status(400).json({
           success: false,
@@ -865,9 +885,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (verified) {
           // Domain verified successfully
-          const updatedSettings = await storage.updateSettings({
-            domainVerified: true
-          });
+          if (isPrimaryDomain) {
+            // Update primary domain verification status
+            await storage.updateSettings({
+              domainVerified: true
+            });
+          } else {
+            // Update additional domain verification status
+            const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+            const updatedDomains = additionalDomains.map((d: any) => {
+              if (d.domain === domain) {
+                return {
+                  ...d,
+                  verified: true,
+                  verifiedAt: new Date().toISOString()
+                };
+              }
+              return d;
+            });
+            
+            await storage.updateSettings({
+              additionalDomains: JSON.stringify(updatedDomains)
+            });
+          }
+          
+          // Get updated settings after verification
+          const updatedSettings = await storage.getSettings();
           
           return res.status(200).json({
             success: true,
@@ -886,7 +929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             found: cnameRecords || []
           });
         }
-      } catch (dnsError) {
+      } catch (dnsError: any) {
         // CNAME not found or DNS error
         return res.status(202).json({
           success: true,
