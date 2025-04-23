@@ -21,6 +21,7 @@ export const verificationLinks = pgTable("verification_links", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),
   verifiedAt: timestamp("verified_at"),
+  renewalRequested: boolean("renewal_requested").notNull().default(false),
 });
 
 export const insertVerificationLinkSchema = createInsertSchema(verificationLinks).pick({
