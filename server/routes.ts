@@ -841,12 +841,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Return updated settings
+      const updatedSettings = await storage.getSettings();
+      
       // Start background verification process
       // This will check the domain periodically without blocking the user
       setTimeout(() => {
-        // Verify the domain without blocking
+        // Verify the domain without blocking, but do it after settings have been fully saved
         verifyDomainInBackground(domain, cnameTarget);
-      }, 100);
+      }, 1000); // Increased delay to ensure settings are written to database
       
       // Return success with CNAME information for admin to configure
       return res.status(200).json({
@@ -856,7 +859,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cnameTarget: cnameTarget,
         instructions: `Create a CNAME record pointing from ${domain} to ${cnameTarget}`,
         verificationStatus: "pending",
-        note: "Domain verification will happen automatically in the background. You can continue adding more domains."
+        note: "Domain verification will happen automatically in the background. You can continue adding more domains.",
+        settings: updatedSettings // Include updated settings so frontend can use this data
       });
     } catch (error) {
       console.error("Error adding domain:", error);
