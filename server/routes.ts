@@ -47,6 +47,14 @@ async function verifyDomainInBackground(
   console.log(`[Background Verification] Checking domain ${domain} (attempt ${attempts + 1}/${maxAttempts})`);
   
   try {
+    // First check our tracker for the domain
+    const trackedDomain = domainTracker.getDomain(domain);
+    if (trackedDomain && trackedDomain.verified) {
+      console.log(`[Background Verification] Domain ${domain} is already verified in our tracker`);
+      return;
+    }
+    
+    // Also check database settings
     const settings = await storage.getSettings();
     if (!settings) {
       console.error("Settings not found during background verification");
@@ -68,9 +76,13 @@ async function verifyDomainInBackground(
     console.log(`[Background Verification] Primary domain: ${settings.customDomain}, Checking: ${domain}`);
     console.log(`[Background Verification] Additional domains: ${settings.additionalDomains}`);
     
+    // If tracked domain exists, use that information instead
+    if (trackedDomain) {
+      console.log(`[Background Verification] Using tracked domain data: ${trackedDomain.domain} with target ${trackedDomain.cnameTarget}`);
+      // Use the tracker's CNAME target, but we'll still continue with verification
+    } 
     // If it's not the primary domain, find it in the additional domains
-    if (!isPrimaryDomain) {
-      // Print what we're looking for
+    else if (!isPrimaryDomain) {
       console.log(`[Background Verification] Looking for ${domain} in additional domains`);
       
       // Check each domain in the additionalDomains array
@@ -86,13 +98,32 @@ async function verifyDomainInBackground(
       
       // If domain is already verified, no need to continue
       if (domainInfo.verified) {
-        console.log(`Domain ${domain} is already verified`);
+        console.log(`Domain ${domain} is already verified in database settings`);
+        // Add to tracker as verified
+        domainTracker.addDomain(domain, domainInfo.cnameTarget, false);
+        domainTracker.markVerified(domain);
         return;
+      }
+      
+      // Make sure this domain is in our tracker
+      if (!trackedDomain) {
+        domainTracker.addDomain(domain, domainInfo.cnameTarget, false);
+        console.log(`[Background Verification] Added domain ${domain} to tracker from additional domains`);
       }
     } else if (settings.domainVerified) {
       // Primary domain is already verified
-      console.log(`Primary domain ${domain} is already verified`);
+      console.log(`Primary domain ${domain} is already verified in database settings`);
+      // Add to tracker as verified if not already there
+      if (!trackedDomain) {
+        domainTracker.addDomain(domain, cnameTarget, true);
+        domainTracker.markVerified(domain);
+        console.log(`[Background Verification] Added verified primary domain ${domain} to tracker`);
+      }
       return;
+    } else if (!trackedDomain) {
+      // Primary domain but not verified and not in tracker yet
+      domainTracker.addDomain(domain, cnameTarget, true);
+      console.log(`[Background Verification] Added primary domain ${domain} to tracker`);
     }
     
     // Use DNS module to check CNAME record
@@ -127,7 +158,11 @@ async function verifyDomainInBackground(
       if (verified) {
         console.log(`[Background Verification] Domain ${domain} verified successfully!`);
         
-        // Update verification status
+        // Update our domain tracker
+        domainTracker.markVerified(domain);
+        console.log(`[Background Verification] Domain ${domain} marked as verified in domain tracker`);
+        
+        // Update verification status in the database
         if (isPrimaryDomain) {
           console.log(`[Background Verification] Updating primary domain verification status`);
           // Update primary domain status
@@ -209,7 +244,14 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
     
     // Check for specific domain request
     if (domainOption !== 'random' && domainOption !== 'default') {
-      // User is requesting a specific domain - check if we have it
+      // First check if the domain is in our tracker and verified
+      const trackedDomain = domainTracker.getDomain(domainOption);
+      if (trackedDomain && trackedDomain.verified) {
+        console.log(`Using verified tracked domain: ${trackedDomain.domain}`);
+        return trackedDomain.domain;
+      }
+      
+      // User is requesting a specific domain - check if it's the primary and verified
       if (domainOption === settings.customDomain && settings.domainVerified) {
         return settings.customDomain;
       }
@@ -222,6 +264,11 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
         );
         
         if (requestedDomain) {
+          // Add to tracker if not already there
+          if (!trackedDomain) {
+            domainTracker.addDomain(requestedDomain.domain, requestedDomain.cnameTarget, false);
+            domainTracker.markVerified(requestedDomain.domain);
+          }
           return requestedDomain.domain;
         }
       } catch (err) {
@@ -233,21 +280,32 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
     if (domainOption === 'random' || domainOption !== 'default') {
       const verifiedDomains = [];
       
-      // Add primary domain if verified
-      if (settings.customDomain && settings.domainVerified) {
-        verifiedDomains.push(settings.customDomain);
+      // First get all verified domains from our tracker
+      const allTrackedDomains = domainTracker.getAllDomains();
+      for (const domain of allTrackedDomains) {
+        if (domain.verified) {
+          verifiedDomains.push(domain.domain);
+        }
       }
       
-      // Add verified additional domains
-      try {
-        const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
-        for (const domain of additionalDomains) {
-          if (domain.verified === true) {
-            verifiedDomains.push(domain.domain);
-          }
+      // If no verified domains in tracker, check settings
+      if (verifiedDomains.length === 0) {
+        // Add primary domain if verified
+        if (settings.customDomain && settings.domainVerified) {
+          verifiedDomains.push(settings.customDomain);
         }
-      } catch (err) {
-        console.error("Error parsing additional domains for random selection:", err);
+        
+        // Add verified additional domains
+        try {
+          const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+          for (const domain of additionalDomains) {
+            if (domain.verified === true) {
+              verifiedDomains.push(domain.domain);
+            }
+          }
+        } catch (err) {
+          console.error("Error parsing additional domains for random selection:", err);
+        }
       }
       
       // If we have verified domains, pick a random one
@@ -267,6 +325,55 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize domain tracker with existing domains from database
+  try {
+    const settings = await storage.getSettings();
+    if (settings) {
+      // Add primary domain if it exists
+      if (settings.customDomain && settings.domainCnameTarget) {
+        console.log(`Adding primary domain to tracker: ${settings.customDomain}`);
+        domainTracker.addDomain(
+          settings.customDomain, 
+          settings.domainCnameTarget, 
+          true
+        );
+        
+        // Mark as verified if applicable
+        if (settings.domainVerified) {
+          console.log(`Marking primary domain as verified in tracker: ${settings.customDomain}`);
+          domainTracker.markVerified(settings.customDomain);
+        }
+      }
+      
+      // Add additional domains if they exist
+      try {
+        const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+        if (additionalDomains && additionalDomains.length) {
+          console.log(`Found ${additionalDomains.length} additional domains to add to tracker`);
+          for (const domain of additionalDomains) {
+            if (domain && domain.domain && domain.cnameTarget) {
+              console.log(`Adding additional domain to tracker: ${domain.domain}`);
+              domainTracker.addDomain(
+                domain.domain, 
+                domain.cnameTarget, 
+                false
+              );
+              
+              // Mark as verified if applicable
+              if (domain.verified) {
+                console.log(`Marking additional domain as verified in tracker: ${domain.domain}`);
+                domainTracker.markVerified(domain.domain);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error(`Error parsing additional domains during tracker initialization:`, e);
+      }
+    }
+  } catch (e) {
+    console.error(`Error initializing domain tracker:`, e);
+  }
   // Configure multer for file uploads
   const upload = multer({ 
     storage: multer.diskStorage({
@@ -997,10 +1104,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Start background verification process
       // This will check the domain periodically without blocking the user
+      // Store domain in our tracker for consistent verification
+      domainTracker.addDomain(domain, cnameTarget, isPrimaryDomain);
+      console.log(`Added domain ${domain} to tracker with CNAME target ${cnameTarget}`);
+      
       setTimeout(() => {
         console.log(`Starting background verification for ${domain} with target ${cnameTarget}`);
         console.log(`Settings have been saved, primary domain: ${finalSettings?.customDomain}`);
         console.log(`Additional domains: ${finalSettings?.additionalDomains}`);
+        console.log(`Domain tracker has: ${domainTracker.getDomain(domain)?.cnameTarget || 'not found'}`);
         
         // Verify the domain without blocking, after settings have been fully saved
         verifyDomainInBackground(domain, cnameTarget);
@@ -1187,6 +1299,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (verified) {
           console.log(`Domain ${domain} successfully verified!`);
+          
+          // Update our domain tracker to mark this domain as verified
+          domainTracker.markVerified(domain);
+          console.log(`Updated domain tracker: Domain ${domain} marked as verified`);
+          
           // Domain verified successfully
           if (isPrimaryDomain) {
             console.log(`Updating primary domain verification status`);
