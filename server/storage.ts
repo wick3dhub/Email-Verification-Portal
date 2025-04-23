@@ -19,6 +19,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser?(id: number, data: Partial<InsertUser>): Promise<User>;
   
   // Verification link operations
   createVerificationLink(data: InsertVerificationLink): Promise<VerificationLink>;
@@ -124,6 +125,21 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+  
+  async updateUser(id: number, data: Partial<InsertUser>): Promise<User> {
+    const existingUser = this.users.get(id);
+    if (!existingUser) {
+      throw new Error(`User with ID ${id} not found`);
+    }
+    
+    const updatedUser = {
+      ...existingUser,
+      ...data
+    };
+    
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
   
   // Verification link operations
@@ -325,6 +341,20 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+  
+  async updateUser(id: number, data: Partial<InsertUser>): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+      
+    if (!updatedUser) {
+      throw new Error(`User with ID ${id} not found`);
+    }
+    
+    return updatedUser;
   }
   
   // Verification link operations

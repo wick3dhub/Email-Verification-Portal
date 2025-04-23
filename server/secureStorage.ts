@@ -41,6 +41,21 @@ export class SecureStorage implements IStorage {
     return user;
   }
   
+  async updateUser(id: number, data: Partial<InsertUser>): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+      
+    if (!updatedUser) {
+      throw new Error(`User with ID ${id} not found`);
+    }
+    
+    console.log(`Successfully updated user credentials for ID ${id}`);
+    return updatedUser;
+  }
+  
   // Verification link operations
   async createVerificationLink(data: InsertVerificationLink): Promise<VerificationLink> {
     // First check for existing links for this email
