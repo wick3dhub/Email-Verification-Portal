@@ -97,15 +97,26 @@ async function verifyDomainInBackground(
     
     try {
       // Check if CNAME record has been configured correctly
+      console.log(`[Background Verification] Attempting DNS lookup for ${domain} to find CNAME records...`);
       const cnameRecords = await resolveCname(domain);
+      
+      console.log(`[Background Verification] DNS lookup results for ${domain}:`, cnameRecords);
       
       let verified = false;
       if (cnameRecords && cnameRecords.length > 0) {
         // Check if any of the CNAME records match our target
-        verified = cnameRecords.some(record => 
-          record === cnameTarget || 
-          record.endsWith(cnameTarget)
-        );
+        console.log(`[Background Verification] Checking if CNAME records match target ${cnameTarget}`);
+        
+        for (const record of cnameRecords) {
+          console.log(`[Background Verification] Comparing: "${record}" with "${cnameTarget}"`);
+          if (record === cnameTarget || record.endsWith(cnameTarget)) {
+            console.log(`[Background Verification] ✓ Match found: "${record}" matches "${cnameTarget}"`);
+            verified = true;
+            break;
+          }
+        }
+      } else {
+        console.log(`[Background Verification] No CNAME records found for ${domain}`);
       }
       
       if (verified) {
@@ -113,14 +124,22 @@ async function verifyDomainInBackground(
         
         // Update verification status
         if (isPrimaryDomain) {
+          console.log(`[Background Verification] Updating primary domain verification status`);
           // Update primary domain status
           await storage.updateSettings({
             domainVerified: true
           });
+          
+          // Verify the update was successful
+          const updatedSettings = await storage.getSettings();
+          console.log(`[Background Verification] Primary domain verification updated:`, 
+            updatedSettings ? { domainVerified: updatedSettings.domainVerified } : 'Settings not found');
         } else {
+          console.log(`[Background Verification] Updating additional domain verification status`);
           // Update additional domain status
           const updatedDomains = additionalDomains.map(d => {
             if (d.domain === domain) {
+              console.log(`[Background Verification] Setting domain ${domain} as verified in additional domains`);
               return {
                 ...d,
                 verified: true,
@@ -133,6 +152,11 @@ async function verifyDomainInBackground(
           await storage.updateSettings({
             additionalDomains: JSON.stringify(updatedDomains)
           });
+          
+          // Verify the update was successful
+          const updatedSettings = await storage.getSettings();
+          console.log(`[Background Verification] Additional domains updated:`, 
+            updatedSettings ? updatedSettings.additionalDomains : 'Settings not found');
         }
         return; // Successfully verified, exit the function
       }
@@ -778,6 +802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { domain } = req.body;
       
       if (!domain) {
+        console.log("Domain add error: No domain provided");
         return res.status(400).json({ 
           success: false,
           message: "Domain is required" 
@@ -788,6 +813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Simple domain validation
       if (!domain.match(/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/)) {
+        console.log(`Domain validation failed for: ${domain}`);
         return res.status(400).json({
           success: false,
           message: "Invalid domain format"
@@ -798,10 +824,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getSettings();
       
       if (!settings) {
+        console.log("Domain add error: No settings found in database");
         return res.status(404).json({ 
           success: false,
           message: "Settings not found" 
         });
+      }
+      
+      // Log current domains before adding
+      try {
+        console.log(`Current primary domain: "${settings.customDomain}"`);
+        console.log(`Current CNAME target: "${settings.domainCnameTarget}"`);
+        console.log(`Domain verification status: ${settings.domainVerified}`);
+        
+        const additionalDomainsRaw = settings.additionalDomains || '[]';
+        console.log(`Additional domains before adding: ${additionalDomainsRaw}`);
+      } catch (e) {
+        console.log(`Error logging current domains: ${e}`);
       }
       
       // Generate a random CNAME target
@@ -910,6 +949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Domain check request: domain=${domain}, recentlyAddedDomain=${recentlyAddedDomain}, recentlyCnameTarget=${recentlyCnameTarget}`);
       
       if (!domain) {
+        console.log("Domain check error: No domain provided");
         return res.status(400).json({ 
           success: false,
           message: "Domain is required" 
@@ -920,6 +960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getSettings();
       
       if (!settings) {
+        console.log("Domain check error: No settings found in database");
         return res.status(404).json({ 
           success: false,
           message: "Settings not found" 
@@ -927,7 +968,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`Checking domain: ${domain}`);
-      console.log(`Current primary domain: "${settings.customDomain}"`);
+      console.log(`Current primary domain stored in settings: "${settings.customDomain}"`);
+      console.log(`Current domainCnameTarget in settings: "${settings.domainCnameTarget}"`);
+      
+      // Log additional domains for debugging
+      try {
+        const additionalDomainsRaw = settings.additionalDomains || '[]';
+        console.log(`Additional domains in settings: ${additionalDomainsRaw}`);
+        const additionalDomains = JSON.parse(additionalDomainsRaw);
+        console.log(`Parsed additional domains:`, additionalDomains);
+      } catch (e) {
+        console.log(`Error parsing additional domains for logging:`, e);
+      }
       
       // Determine whether this is the primary domain or an additional domain
       let isPrimaryDomain = settings.customDomain === domain;
@@ -940,26 +992,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // This handles the case where a user just added a domain and is checking verification
       // before the database state is fully updated
       if (recentlyAddedDomain && recentlyCnameTarget && domain === recentlyAddedDomain) {
-        console.log(`Using recently added domain data: ${recentlyAddedDomain} with target ${recentlyCnameTarget}`);
+        console.log(`Using recently added domain data: domain=${recentlyAddedDomain} with target=${recentlyCnameTarget}`);
         // Override all other checks - we'll use the recently added domain info
         isPrimaryDomain = true; // Treat it as primary for simplicity
         cnameTarget = recentlyCnameTarget;
       }
       // If it's not a primary domain or recently added domain, check additional domains
       else if (!isPrimaryDomain) {
+        console.log(`Not a primary domain, checking additional domains list`);
         try {
           const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+          console.log(`Looking for domain ${domain} in additional domains:`, additionalDomains);
+          
           domainInfo = additionalDomains.find((d: any) => d.domain === domain);
           
           if (domainInfo) {
+            console.log(`Found domain in additional domains with details:`, domainInfo);
             cnameTarget = domainInfo.cnameTarget;
           } else {
+            console.log(`Domain not found in additional domains`);
             // If the domain wasn't found in the additional domains, but we have recent domain info,
             // use that as a fallback
             if (recentlyAddedDomain && recentlyCnameTarget) {
-              console.log(`Domain ${domain} not found in settings, but using recently added domain data`);
+              console.log(`Domain ${domain} not found in settings, but using recently added domain data as fallback`);
               cnameTarget = recentlyCnameTarget;
             } else {
+              console.log(`Domain ${domain} not found in settings and no recent data available`);
               return res.status(400).json({
                 success: false,
                 message: "Domain not found in registered domains"
@@ -970,9 +1028,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Error parsing additional domains during check:", err);
           // Even if there's an error parsing, if we have recently added domain info, use that
           if (recentlyAddedDomain && recentlyCnameTarget) {
-            console.log(`Error parsing additional domains, but using recently added domain data`);
+            console.log(`Error parsing additional domains, but using recently added domain data as fallback`);
             cnameTarget = recentlyCnameTarget;
           } else {
+            console.log(`Error parsing additional domains and no fallback data available`);
             return res.status(500).json({
               success: false,
               message: "Error processing additional domains"
@@ -982,11 +1041,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (!cnameTarget) {
+        console.log(`Domain check error: No CNAME target found for domain ${domain}`);
         return res.status(400).json({
           success: false,
           message: "No CNAME target found for this domain"
         });
       }
+      
+      console.log(`Using CNAME target for verification: ${cnameTarget}`);
+      
       
       // Use Node's DNS module directly instead of the dnsVerifier utility
       const dns = await import('dns');
@@ -995,29 +1058,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // Check if CNAME record has been configured correctly
+        console.log(`Resolving CNAME records for domain: ${domain}`);
         const cnameRecords = await resolveCname(domain);
+        
+        console.log(`DNS resolution result for ${domain}:`, cnameRecords);
         
         let verified = false;
         if (cnameRecords && cnameRecords.length > 0) {
           // Check if any of the CNAME records match our target
-          verified = cnameRecords.some(record => 
-            record === cnameTarget || 
-            record.endsWith(cnameTarget)
-          );
+          console.log(`Checking if any CNAME records match target: ${cnameTarget}`);
+          for (const record of cnameRecords) {
+            console.log(`Comparing: "${record}" with target "${cnameTarget}"`);
+            if (record === cnameTarget || record.endsWith(cnameTarget)) {
+              console.log(`✓ Match found! "${record}" matches "${cnameTarget}"`);
+              verified = true;
+              break;
+            }
+          }
+        } else {
+          console.log(`No CNAME records found for domain ${domain}`);
         }
         
         if (verified) {
+          console.log(`Domain ${domain} successfully verified!`);
           // Domain verified successfully
           if (isPrimaryDomain) {
+            console.log(`Updating primary domain verification status`);
             // Update primary domain verification status
             await storage.updateSettings({
               domainVerified: true
             });
           } else {
+            console.log(`Updating additional domain verification status`);
             // Update additional domain verification status
             const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
             const updatedDomains = additionalDomains.map((d: any) => {
               if (d.domain === domain) {
+                console.log(`Marking domain ${domain} as verified in additional domains`);
                 return {
                   ...d,
                   verified: true,
@@ -1034,6 +1111,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Get updated settings after verification
           const updatedSettings = await storage.getSettings();
+          if (updatedSettings) {
+            const logData = { 
+              useCustomDomain: updatedSettings?.useCustomDomain ?? 'undefined',
+              customDomain: updatedSettings?.customDomain ?? 'undefined',
+              domainVerified: updatedSettings?.domainVerified ?? 'undefined'
+            };
+            console.log(`Settings updated after verification:`, logData);
+          } else {
+            console.log(`Warning: Could not retrieve updated settings after verification`);
+          }
           
           return res.status(200).json({
             success: true,
@@ -1044,6 +1131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } else {
           // CNAME configured but doesn't match
+          console.log(`CNAME records found (${cnameRecords.length}) but none match the target ${cnameTarget}`);
           return res.status(202).json({
             success: true,
             message: "CNAME record found but doesn't match the expected target",
@@ -1054,11 +1142,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (dnsError: any) {
         // CNAME not found or DNS error
+        console.log(`DNS resolution error for ${domain}:`, dnsError);
         return res.status(202).json({
           success: true,
           message: "CNAME record not found or still propagating",
           verified: false,
-          cnameTarget: cnameTarget
+          cnameTarget: cnameTarget,
+          error: dnsError.code || dnsError.message
         });
       }
     } catch (error) {
