@@ -13,6 +13,13 @@ export interface TrackedDomain {
   timestamp: number;
   isPrimary?: boolean;
   verified?: boolean;
+  reputation?: {
+    score: number; // 0-100
+    risk: 'low' | 'medium' | 'high' | 'unknown';
+    lastChecked: number;
+    source: string;
+    details?: any;
+  };
 }
 
 // In-memory store for recently added domains
@@ -89,6 +96,42 @@ class DomainTracker {
   clearAll(): void {
     this.recentDomains.clear();
     console.log('Domain tracker: Cleared all domains from tracker');
+  }
+
+  /**
+   * Update a domain's reputation score
+   * @param domain Domain name
+   * @param reputation Reputation data
+   * @returns Updated domain object or undefined if domain not found
+   */
+  updateDomainReputation(domain: string, reputation: TrackedDomain['reputation']): TrackedDomain | undefined {
+    const trackedDomain = this.recentDomains.get(domain);
+    if (trackedDomain) {
+      trackedDomain.reputation = reputation;
+      this.recentDomains.set(domain, trackedDomain);
+      console.log(`Domain tracker: Updated reputation for ${domain} - Score: ${reputation.score}`);
+      return trackedDomain;
+    }
+    return undefined;
+  }
+
+  /**
+   * Check if a domain's reputation data is recent
+   * @param domain Domain name
+   * @param maxAgeMs Maximum age in milliseconds (default: 24 hours)
+   * @returns True if reputation data exists and is recent
+   */
+  hasRecentReputationData(domain: string, maxAgeMs: number = 24 * 60 * 60 * 1000): boolean {
+    const trackedDomain = this.recentDomains.get(domain);
+    if (
+      trackedDomain && 
+      trackedDomain.reputation && 
+      trackedDomain.reputation.lastChecked
+    ) {
+      const age = Date.now() - trackedDomain.reputation.lastChecked;
+      return age < maxAgeMs;
+    }
+    return false;
   }
 }
 

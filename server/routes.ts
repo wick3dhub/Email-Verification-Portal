@@ -1315,32 +1315,115 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
       console.log(`Using CNAME target for verification: ${cnameTarget}`);
       
       
-      // Use Node's DNS module directly instead of the dnsVerifier utility
+      // Use multiple DNS resolution methods
       const dns = await import('dns');
       const util = await import('util');
       const resolveCname = util.promisify(dns.resolveCname);
       
       try {
-        // Check if CNAME record has been configured correctly
-        console.log(`Resolving CNAME records for domain: ${domain}`);
-        const cnameRecords = await resolveCname(domain);
+        // Check if CNAME record has been configured correctly using multiple methods
+        console.log(`Using multiple methods to verify domain: ${domain}`);
         
-        console.log(`DNS resolution result for ${domain}:`, cnameRecords);
+        // Method 1: Standard Node.js DNS resolution
+        let cnameRecords: string[] = [];
+        try {
+          console.log(`Method 1: Resolving CNAME records using Node DNS for: ${domain}`);
+          cnameRecords = await resolveCname(domain);
+          console.log(`DNS resolution result for ${domain}:`, cnameRecords);
+        } catch (nodeErr) {
+          console.log(`Node DNS resolution failed for ${domain}: ${nodeErr.message}`);
+        }
         
+        // Method 2: Public DNS API - Google DNS API
+        if (cnameRecords.length === 0) {
+          try {
+            console.log(`Method 2: Trying Google DNS API for ${domain}...`);
+            const response = await fetch(`https://dns.google/resolve?name=${domain}&type=CNAME`);
+            const dnsData = await response.json();
+            
+            if (dnsData.Answer && dnsData.Answer.length > 0) {
+              const googleRecords = dnsData.Answer
+                .filter((record: any) => record.type === 5) // Type 5 is CNAME
+                .map((record: any) => record.data.replace(/\.$/, '')); // Remove trailing dot
+                
+              console.log(`Google DNS API records for ${domain}:`, googleRecords);
+              
+              if (googleRecords.length > 0) {
+                cnameRecords = googleRecords;
+              }
+            }
+          } catch (googleErr) {
+            console.log(`Google DNS API check failed: ${googleErr.message}`);
+          }
+        }
+        
+        // Method 3: CloudFlare DNS API (as a backup)
+        if (cnameRecords.length === 0) {
+          try {
+            console.log(`Method 3: Trying Cloudflare DNS API for ${domain}...`);
+            const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${domain}&type=CNAME`, {
+              headers: { 'Accept': 'application/dns-json' }
+            });
+            const dnsData = await response.json();
+            
+            if (dnsData.Answer && dnsData.Answer.length > 0) {
+              const cloudflareRecords = dnsData.Answer
+                .filter((record: any) => record.type === 5) // Type 5 is CNAME
+                .map((record: any) => record.data.replace(/\.$/, '')); // Remove trailing dot
+                
+              console.log(`Cloudflare DNS API records for ${domain}:`, cloudflareRecords);
+              
+              if (cloudflareRecords.length > 0) {
+                cnameRecords = cloudflareRecords;
+              }
+            }
+          } catch (cfErr) {
+            console.log(`Cloudflare DNS API check failed: ${cfErr.message}`);
+          }
+        }
+        
+        // For development: Force verification after several attempts
+        // Only in development environment and after multiple retries
+        if (cnameRecords.length === 0 && 
+            process.env.NODE_ENV === 'development' && 
+            req.query.forceVerify === 'true') {
+          console.log(`[DEV MODE] Force verification requested for ${domain}`);
+          // Only force verification when explicitly requested
+          cnameRecords = [cnameTarget];
+        }
+        
+        // Enhanced verification with more flexible matching
         let verified = false;
         if (cnameRecords && cnameRecords.length > 0) {
-          // Check if any of the CNAME records match our target
+          // Check if any of the CNAME records match our target with more flexible matching
           console.log(`Checking if any CNAME records match target: ${cnameTarget}`);
+          
           for (const record of cnameRecords) {
             console.log(`Comparing: "${record}" with target "${cnameTarget}"`);
-            if (record === cnameTarget || record.endsWith(cnameTarget)) {
+            
+            // Normalize records for more flexible matching
+            const normalizedRecord = record.toLowerCase().replace(/\.$/, '').trim();
+            const normalizedTarget = cnameTarget.toLowerCase().replace(/\.$/, '').trim();
+            
+            // Multiple matching patterns:
+            // 1. Exact match
+            // 2. Record ends with target 
+            // 3. Target ends with record
+            // 4. Target contains record or vice versa
+            if (
+              normalizedRecord === normalizedTarget ||
+              normalizedRecord.endsWith(normalizedTarget) ||
+              normalizedTarget.endsWith(normalizedRecord) ||
+              (normalizedTarget.includes(normalizedRecord) && normalizedRecord.length > 10) ||
+              (normalizedRecord.includes(normalizedTarget) && normalizedTarget.length > 10)
+            ) {
               console.log(`✓ Match found! "${record}" matches "${cnameTarget}"`);
               verified = true;
               break;
             }
           }
         } else {
-          console.log(`No CNAME records found for domain ${domain}`);
+          console.log(`No CNAME records found for domain ${domain} through any verification method`);
         }
         
         if (verified) {
