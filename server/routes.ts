@@ -9,6 +9,7 @@ import multer from "multer";
 import os from "os";
 import type { Setting } from "@shared/schema";
 import { domainTracker } from "./services/domainTracker";
+import { getDomainReputation } from './services/domainReputation';
 
 // This file uses the domainTracker service to improve domain verification reliability
 // The tracker ensures domain/CNAME pairs are properly tracked between frontend and backend
@@ -1021,6 +1022,127 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
     }
   });
 
+  // Get all domains with reputation scores
+  app.get("/api/domains", async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getSettings();
+      
+      if (!settings) {
+        return res.status(404).json({ message: "Settings not found" });
+      }
+      
+      const defaultDomain = req.get('host') || 'localhost:5000';
+      const domains = [];
+      
+      // Add default domain
+      domains.push({
+        id: 'default',
+        name: defaultDomain,
+        type: 'default'
+      });
+      
+      // Detailed list of all domains (including unverified) for admin purposes
+      const allDomains = [];
+      
+      // Add primary domain if set
+      if (settings.customDomain) {
+        allDomains.push({
+          domain: settings.customDomain,
+          isPrimary: true,
+          cnameTarget: settings.domainCnameTarget,
+          verified: settings.domainVerified
+        });
+      }
+      
+      // Add all additional domains
+      try {
+        const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+        
+        if (Array.isArray(additionalDomains)) {
+          additionalDomains.forEach(domainEntry => {
+            if (typeof domainEntry === 'string') {
+              // Old format
+              allDomains.push({
+                domain: domainEntry,
+                isPrimary: false,
+                verified: false,
+                needsMigration: true
+              });
+            } else {
+              // New format
+              allDomains.push({
+                domain: domainEntry.domain,
+                isPrimary: false,
+                cnameTarget: domainEntry.cnameTarget,
+                verified: domainEntry.verified
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Error parsing additional domains:", err);
+      }
+      
+      // Add reputation data to each domain
+      for (const domain of allDomains) {
+        // Check if the domain already has reputation data in our tracker
+        const trackedDomain = domainTracker.getDomain(domain.domain);
+        
+        // If domain has reputation data in tracker, use it
+        if (trackedDomain && trackedDomain.reputation) {
+          domain.reputation = {
+            score: trackedDomain.reputation.score,
+            risk: trackedDomain.reputation.risk,
+            lastChecked: new Date(trackedDomain.reputation.lastChecked).toISOString(),
+            source: trackedDomain.reputation.source
+          };
+          
+          // Add visual indicator
+          domain.indicator = {
+            color: trackedDomain.reputation.score >= 70 ? 'green' : 
+                   (trackedDomain.reputation.score >= 40 ? 'yellow' : 'red'),
+            label: trackedDomain.reputation.score >= 70 ? 'Good' : 
+                   (trackedDomain.reputation.score >= 40 ? 'Medium' : 'Poor')
+          };
+        } else {
+          // Default "unknown" reputation
+          domain.reputation = {
+            score: 50,
+            risk: 'unknown',
+            lastChecked: null,
+            source: 'none'
+          };
+          
+          domain.indicator = {
+            color: 'gray',
+            label: 'Unknown'
+          };
+        }
+      }
+      
+      // Sort domains: primary first, then by verification status (verified first)
+      allDomains.sort((a, b) => {
+        if (a.isPrimary && !b.isPrimary) return -1;
+        if (!a.isPrimary && b.isPrimary) return 1;
+        if (a.verified && !b.verified) return -1;
+        if (!a.verified && b.verified) return 1;
+        return 0;
+      });
+      
+      return res.status(200).json({
+        success: true,
+        domains,
+        all: allDomains
+      });
+    } catch (error) {
+      console.error("Error fetching domains with reputation:", error);
+      return res.status(500).json({ 
+        success: false,
+        message: "Failed to fetch domains"
+      });
+    }
+  });
+
   app.get("/api/settings", async (req: Request, res: Response) => {
     try {
       const settings = await storage.getSettings();
@@ -1185,6 +1307,60 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
   });
   
   // Check domain verification status
+  // Get domain reputation from various sources
+  app.get("/api/domain/reputation/:domain", async (req: Request, res: Response) => {
+    try {
+      const { domain } = req.params;
+      const forceRefresh = req.query.refresh === 'true';
+      
+      if (!domain) {
+        return res.status(400).json({
+          success: false,
+          message: "Domain parameter is required"
+        });
+      }
+      
+      console.log(`Checking reputation for domain: ${domain}, force refresh: ${forceRefresh}`);
+      
+      // Get domain reputation data
+      const reputation = await getDomainReputation(domain, forceRefresh);
+      
+      // Add the domain to our tracker if it's not already there
+      let trackedDomain = domainTracker.getDomain(domain);
+      if (!trackedDomain) {
+        // If not in tracker, add it with a placeholder CNAME target
+        domainTracker.addDomain(domain, 'reputation-check', false);
+        trackedDomain = domainTracker.getDomain(domain);
+      }
+      
+      // Update the domain reputation in our tracker
+      domainTracker.updateDomainReputation(domain, reputation);
+      
+      return res.status(200).json({
+        success: true,
+        domain,
+        reputation: {
+          score: reputation.score,
+          risk: reputation.risk,
+          lastChecked: new Date(reputation.lastChecked).toISOString(),
+          source: reputation.source,
+          details: reputation.details
+        },
+        // Add visual indicator based on score
+        indicator: {
+          color: reputation.score >= 70 ? 'green' : (reputation.score >= 40 ? 'yellow' : 'red'),
+          label: reputation.score >= 70 ? 'Good' : (reputation.score >= 40 ? 'Medium' : 'Poor')
+        }
+      });
+    } catch (error) {
+      console.error(`Error checking domain reputation:`, error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to check domain reputation. Please try again later."
+      });
+    }
+  });
+
   app.post("/api/domain/check", async (req: Request, res: Response) => {
     try {
       const { domain, recentlyAddedDomain, recentlyCnameTarget } = req.body;
