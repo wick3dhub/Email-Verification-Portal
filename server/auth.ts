@@ -26,15 +26,19 @@ export async function setupAuth(app: Express, pool: Pool) {
         pool,
         tableName: "session", // Default session table name
         createTableIfMissing: true,
+        pruneSessionInterval: 60 // Prune expired sessions every minute
       }),
+      name: 'wick3d_portal_sid', // Custom session cookie name
       secret: sessionSecret,
-      resave: true, // Changed to true to ensure session is saved
-      saveUninitialized: true, // Changed to true to help with new sessions
+      resave: true,
+      rolling: true, // Refresh session with each request
+      saveUninitialized: false, // Don't save empty sessions
       cookie: {
         secure: false, // Disable secure for development
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-        sameSite: 'lax', // Add SameSite attribute
+        path: '/',
+        sameSite: 'lax',
       },
     })
   );
@@ -68,7 +72,10 @@ export async function setupAuth(app: Express, pool: Pool) {
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     const { username, password } = req.body;
     
+    console.log(`Login attempt for username: ${username}`);
+    
     if (!username || !password) {
+      console.log("Login error: Missing username or password");
       return res.status(400).json({ message: "Username and password are required" });
     }
     
@@ -76,28 +83,42 @@ export async function setupAuth(app: Express, pool: Pool) {
       const user = await storage.getUserByUsername(username);
       
       if (!user) {
+        console.log(`Login failed: User ${username} not found`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
       // This depends on whether the password is already hashed in the database
       // For now, we're doing direct comparison (needs to be improved)
       if (user.password !== password) {
+        console.log(`Login failed: Invalid password for ${username}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      // Set user ID in session and save it
-      req.session.userId = user.id;
+      console.log(`User ${username} authenticated successfully, setting session`);
       
-      // Make sure session is saved before responding
-      req.session.save((err) => {
+      // Set user ID in session
+      req.session.regenerate((err) => {
         if (err) {
-          console.error("Session save error:", err);
+          console.error("Session regeneration error:", err);
           return res.status(500).json({ message: "Error during login" });
         }
         
-        return res.status(200).json({
-          id: user.id,
-          username: user.username,
+        // Set user data in the fresh session
+        req.session.userId = user.id;
+        
+        // Save the session
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return res.status(500).json({ message: "Error during login" });
+          }
+          
+          console.log(`Session saved successfully for user ${username}, session ID: ${req.sessionID}`);
+          
+          return res.status(200).json({
+            id: user.id,
+            username: user.username,
+          });
         });
       });
     } catch (error) {
@@ -117,16 +138,38 @@ export async function setupAuth(app: Express, pool: Pool) {
   });
   
   app.get("/api/auth/check", async (req: Request, res: Response) => {
+    console.log("Auth check request received");
+    console.log("Session data:", {
+      id: req.sessionID,
+      cookie: req.session.cookie,
+      userId: req.session.userId
+    });
+    
     if (!req.session.userId) {
+      console.log("No userId in session, returning 401");
       return res.status(401).json({ authenticated: false });
     }
     
     try {
+      console.log(`Looking up user with ID ${req.session.userId}`);
       const user = await storage.getUser(req.session.userId);
       
       if (!user) {
+        console.log(`User with ID ${req.session.userId} not found in database`);
+        // Clean up the invalid session
+        req.session.destroy(() => {});
         return res.status(401).json({ authenticated: false });
       }
+      
+      console.log(`User found: ${user.username}, authenticated successfully`);
+      
+      // Refresh the session to extend its life
+      req.session.touch();
+      req.session.save((err) => {
+        if (err) {
+          console.error("Error refreshing session:", err);
+        }
+      });
       
       return res.status(200).json({
         authenticated: true,
