@@ -27,7 +27,8 @@ export async function setupAuth(app: Express, pool: Pool) {
         pool,
         tableName: "session",
         createTableIfMissing: true,
-        pruneSessionInterval: 60
+        pruneSessionInterval: 60,
+        errorLog: console.error // Add error logging for session store issues
       }),
       name: 'wick3d_portal_sid',
       secret: sessionSecret,
@@ -37,7 +38,7 @@ export async function setupAuth(app: Express, pool: Pool) {
       cookie: {
         secure: false,
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24 * 7,
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
         path: '/',
         sameSite: 'lax', // Use lax for better compatibility
       },

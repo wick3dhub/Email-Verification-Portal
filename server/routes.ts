@@ -176,18 +176,42 @@ async function verifyDomainInBackground(
             updatedSettings ? { domainVerified: updatedSettings.domainVerified } : 'Settings not found');
         } else {
           console.log(`[Background Verification] Updating additional domain verification status`);
-          // Update additional domain status
-          const updatedDomains = additionalDomains.map(d => {
-            if (d.domain === domain) {
-              console.log(`[Background Verification] Setting domain ${domain} as verified in additional domains`);
-              return {
-                ...d,
-                verified: true,
-                verifiedAt: new Date().toISOString()
-              };
-            }
-            return d;
-          });
+          // Update additional domain status with robust handling
+          let updatedDomains = [...additionalDomains]; // Ensure we have a copy
+          
+          // Check if domain exists in the list
+          const domainExists = additionalDomains.some(d => d.domain === domain);
+          if (!domainExists) {
+            console.log(`[Background Verification] Domain ${domain} not found in additional domains, adding it`);
+            updatedDomains.push({
+              domain,
+              cnameTarget,
+              verified: true,
+              verifiedAt: new Date().toISOString(),
+              addedAt: new Date().toISOString()
+            });
+          } else {
+            // Update existing domain
+            updatedDomains = additionalDomains.map(d => {
+              if (d.domain === domain) {
+                console.log(`[Background Verification] Setting domain ${domain} as verified in additional domains`);
+                return {
+                  ...d,
+                  verified: true,
+                  verifiedAt: new Date().toISOString()
+                };
+              }
+              return d;
+            });
+          }
+          
+          console.log(`[Background Verification] Saving updated additional domains:`, updatedDomains);
+          
+          // Get the freshest settings before updating
+          const freshSettings = await storage.getSettings();
+          const currentJson = freshSettings?.additionalDomains || '[]';
+          
+          console.log(`[Background Verification] Current domains before update: ${currentJson}`);
           
           await storage.updateSettings({
             additionalDomains: JSON.stringify(updatedDomains)
@@ -1336,21 +1360,50 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
           } else {
             console.log(`Updating additional domain verification status`);
             // Update additional domain verification status
-            const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
-            const updatedDomains = additionalDomains.map((d: any) => {
-              if (d.domain === domain) {
-                console.log(`Marking domain ${domain} as verified in additional domains`);
-                return {
-                  ...d,
-                  verified: true,
-                  verifiedAt: new Date().toISOString()
-                };
-              }
-              return d;
-            });
+            let additionalDomains = [];
+            try {
+              additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+            } catch (e) {
+              console.error('Error parsing additional domains:', e);
+              additionalDomains = [];
+            }
             
+            // Log current domains
+            console.log('Current additional domains before update:', additionalDomains);
+            
+            // Check if domain exists in the list
+            const domainExists = additionalDomains.some((d: any) => d.domain === domain);
+            if (!domainExists) {
+              console.log(`Domain ${domain} not found in additional domains, adding it`);
+              additionalDomains.push({
+                domain,
+                cnameTarget,
+                verified: true,
+                verifiedAt: new Date().toISOString(),
+                addedAt: new Date().toISOString()
+              });
+            } else {
+              // Update existing domain
+              console.log(`Updating existing domain ${domain} in additional domains`);
+              additionalDomains = additionalDomains.map((d: any) => {
+                if (d.domain === domain) {
+                  console.log(`Marking domain ${domain} as verified in additional domains`);
+                  return {
+                    ...d,
+                    verified: true,
+                    verifiedAt: new Date().toISOString(),
+                    cnameTarget: cnameTarget || d.cnameTarget
+                  };
+                }
+                return d;
+              });
+            }
+            
+            console.log('Updated additional domains:', additionalDomains);
+            
+            // Update the settings with the new domains list
             await storage.updateSettings({
-              additionalDomains: JSON.stringify(updatedDomains)
+              additionalDomains: JSON.stringify(additionalDomains)
             });
           }
           
