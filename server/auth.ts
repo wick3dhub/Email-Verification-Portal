@@ -19,26 +19,26 @@ export async function setupAuth(app: Express, pool: Pool) {
   // Generate a secure session secret or use from environment
   const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
   
-  // Set up session middleware
+  // Set up session middleware with specific configuration for Replit environment
   app.use(
     session({
       store: new PgSession({
         pool,
-        tableName: "session", // Default session table name
+        tableName: "session",
         createTableIfMissing: true,
-        pruneSessionInterval: 60 // Prune expired sessions every minute
+        pruneSessionInterval: 60
       }),
-      name: 'wick3d_portal_sid', // Custom session cookie name
+      name: 'wick3d_portal_sid',
       secret: sessionSecret,
-      resave: true,
-      rolling: true, // Refresh session with each request
-      saveUninitialized: false, // Don't save empty sessions
+      resave: true, 
+      rolling: true,
+      saveUninitialized: true, // Set to true for compatibility
       cookie: {
-        secure: false, // Disable secure for development
+        secure: false,
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+        maxAge: 1000 * 60 * 60 * 24 * 7,
         path: '/',
-        sameSite: 'lax',
+        sameSite: 'lax', // Use lax for better compatibility
       },
     })
   );
