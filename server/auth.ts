@@ -8,7 +8,8 @@ import { db } from "./db";
 
 declare module "express-session" {
   interface SessionData {
-    userId: number;
+    userId?: number;
+    testValue?: string;
   }
 }
 
@@ -96,31 +97,29 @@ export async function setupAuth(app: Express, pool: Pool) {
       
       console.log(`User ${username} authenticated successfully, setting session`);
       
-      // Set user ID in session
-      req.session.regenerate((err) => {
-        if (err) {
-          console.error("Session regeneration error:", err);
-          return res.status(500).json({ message: "Error during login" });
-        }
-        
-        // Set user data in the fresh session
-        req.session.userId = user.id;
-        
-        // Save the session
-        req.session.save((saveErr) => {
-          if (saveErr) {
-            console.error("Session save error:", saveErr);
-            return res.status(500).json({ message: "Error during login" });
+      // Set directly without regenerate
+      req.session.userId = user.id;
+      
+      // Save immediately
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            reject(err);
+          } else {
+            console.log(`Session saved successfully for user ${username}, session ID: ${req.sessionID}`);
+            console.log(`Session data after save:`, req.session);
+            resolve();
           }
-          
-          console.log(`Session saved successfully for user ${username}, session ID: ${req.sessionID}`);
-          
-          return res.status(200).json({
-            id: user.id,
-            username: user.username,
-          });
         });
       });
+      
+      // Return success
+      return res.status(200).json({
+        id: user.id,
+        username: user.username,
+      });
+      
     } catch (error) {
       console.error("Login error:", error);
       return res.status(500).json({ message: "Internal server error" });
@@ -137,12 +136,56 @@ export async function setupAuth(app: Express, pool: Pool) {
     });
   });
   
+  // Test routes for session debugging
+  app.get("/api/auth/session-test", (req: Request, res: Response) => {
+    // Set a simple value in the session
+    req.session.testValue = "test-" + Date.now();
+    
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session test save error:", err);
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      
+      console.log("Session test value set:", {
+        id: req.sessionID,
+        testValue: req.session.testValue,
+        cookie: req.session.cookie
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Session test value set", 
+        sessionId: req.sessionID,
+        testValue: req.session.testValue
+      });
+    });
+  });
+  
+  app.get("/api/auth/session-check", (req: Request, res: Response) => {
+    console.log("Session test check:", {
+      id: req.sessionID,
+      testValue: req.session.testValue,
+      cookie: req.session.cookie
+    });
+    
+    res.json({
+      success: true,
+      hasTestValue: !!req.session.testValue,
+      testValue: req.session.testValue || null,
+      sessionId: req.sessionID
+    });
+  });
+
   app.get("/api/auth/check", async (req: Request, res: Response) => {
     console.log("Auth check request received");
     console.log("Session data:", {
       id: req.sessionID,
       cookie: req.session.cookie,
-      userId: req.session.userId
+      userId: req.session.userId,
+      headers: {
+        cookie: req.headers.cookie
+      }
     });
     
     if (!req.session.userId) {
@@ -165,10 +208,15 @@ export async function setupAuth(app: Express, pool: Pool) {
       
       // Refresh the session to extend its life
       req.session.touch();
-      req.session.save((err) => {
-        if (err) {
-          console.error("Error refreshing session:", err);
-        }
+      
+      // Save the session to ensure it persists
+      await new Promise<void>((resolve) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Error refreshing session:", err);
+          }
+          resolve();
+        });
       });
       
       return res.status(200).json({
@@ -177,6 +225,7 @@ export async function setupAuth(app: Express, pool: Pool) {
           id: user.id,
           username: user.username,
         },
+        sessionId: req.sessionID
       });
     } catch (error) {
       console.error("Auth check error:", error);

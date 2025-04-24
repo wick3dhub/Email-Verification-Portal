@@ -4,6 +4,16 @@ import connectPgSimple from 'connect-pg-simple';
 import { Pool } from '@neondatabase/serverless';
 import { randomBytes } from 'crypto';
 
+// Declare session data type
+declare module 'express-session' {
+  interface SessionData {
+    testData: {
+      value: string;
+      timestamp: number;
+    };
+  }
+}
+
 // Create a simple Express app to test session functionality
 async function testSessionFunctionality() {
   try {
