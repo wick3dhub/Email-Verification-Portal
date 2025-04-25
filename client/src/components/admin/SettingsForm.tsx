@@ -27,7 +27,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 // DNS instructions state
 interface DnsInstructionsState {
   domain: string;
-  cnameTarget: string;
+  verificationToken: string; // Changed from cnameTarget to verificationToken
   showInstructions: boolean;
 }
 
@@ -89,7 +89,7 @@ export default function SettingsForm() {
   // State for DNS instructions
   const [dnsInstructions, setDnsInstructions] = useState<DnsInstructionsState>({
     domain: '',
-    cnameTarget: '',
+    verificationToken: '',
     showInstructions: false
   });
   
@@ -100,14 +100,14 @@ export default function SettingsForm() {
   const checkDomainVerification = async (domain: string) => {
     try {
       console.log(`Checking verification for domain: ${domain}`);
-      console.log(`Current DNS instructions domain: ${dnsInstructions.domain}, CNAME: ${dnsInstructions.cnameTarget}`);
+      console.log(`Current DNS instructions domain: ${dnsInstructions.domain}, Token: ${dnsInstructions.verificationToken}`);
       
       // Always send the domain being checked along with the recently added domain information
       // This ensures the backend can handle domains that were just added but not yet in settings
       const res = await apiRequest("POST", "/api/domain/check", { 
         domain,
         recentlyAddedDomain: dnsInstructions.domain,
-        recentlyCnameTarget: dnsInstructions.cnameTarget
+        verificationToken: dnsInstructions.verificationToken
       });
       const data = await res.json();
       
@@ -273,7 +273,7 @@ export default function SettingsForm() {
         // If domain is set but not verified, show instructions for configuration
         setDnsInstructions({
           domain: settings.customDomain,
-          cnameTarget: settings.domainCnameTarget,
+          verificationToken: settings.domainCnameTarget,
           showInstructions: true
         });
         
@@ -770,21 +770,21 @@ export default function SettingsForm() {
                     <AlertTitle className="text-blue-700">DNS Configuration Required</AlertTitle>
                     <AlertDescription className="mt-2">
                       <p className="mb-2">
-                        To verify your domain, add the following CNAME record in your DNS settings:
+                        To verify your domain, add the following TXT record in your DNS settings:
                       </p>
                       
                       <div className="bg-white p-3 rounded border border-blue-200 mb-3 font-mono text-sm">
                         <p><span className="font-semibold">Domain:</span> {dnsInstructions.domain}</p>
-                        <p><span className="font-semibold">Record Type:</span> CNAME</p>
+                        <p><span className="font-semibold">Record Type:</span> TXT</p>
                         <div className="flex items-center">
-                          <p><span className="font-semibold">Points to:</span> {dnsInstructions.cnameTarget}</p>
+                          <p><span className="font-semibold">Value:</span> wick3d-verification={dnsInstructions.verificationToken}</p>
                           <Button 
                             variant="ghost" 
                             size="sm"
                             className="ml-2 h-6 w-6 p-0"
                             onClick={() => {
-                              navigator.clipboard.writeText(dnsInstructions.cnameTarget);
-                              toast({ title: "Copied", description: "CNAME target copied to clipboard" });
+                              navigator.clipboard.writeText(`wick3d-verification=${dnsInstructions.verificationToken}`);
+                              toast({ title: "Copied", description: "TXT record value copied to clipboard" });
                             }}
                           >
                             <Copy className="h-3 w-3" />
