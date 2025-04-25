@@ -14,7 +14,7 @@ import { verifyDomainOwnership, generateVerificationToken } from './services/dom
 
 // This file uses the domainTracker service to improve domain verification reliability
 // The tracker ensures domain/verification-token pairs are properly tracked between frontend and backend
-// throughout the verification process, regardless of database sync timing.
+// throughout the TXT record verification process, regardless of database sync timing.
 
 // Define interface for domain objects
 interface DomainInfo {
@@ -136,7 +136,7 @@ async function checkTxtRecords(domain: string, verificationToken: string) {
  * Background verification for domains
  * Attempts to verify a domain's TXT record repeatedly without blocking the user
  * @param domain Domain to verify
- * @param verificationToken Expected TXT record verification token
+ * @param verificationToken Expected TXT record verification token (format: wick3d-verification=TOKEN)
  * @param attempts Current attempt count (used for recursion)
  * @param maxAttempts Maximum number of verification attempts
  * @param delayMs Delay between verification attempts in milliseconds
@@ -190,7 +190,7 @@ async function verifyDomainInBackground(
     // If tracked domain exists, use that information instead
     if (trackedDomain) {
       console.log(`[Background Verification] Using tracked domain data: ${trackedDomain.domain} with verification token ${trackedDomain.verificationToken}`);
-      // Use the tracker's CNAME target, but we'll still continue with verification
+      // Use the tracker's verification token, but we'll still continue with verification
     } 
     // If it's not the primary domain, find it in the additional domains
     else if (!isPrimaryDomain) {
@@ -329,7 +329,7 @@ async function verifyDomainInBackground(
         return; // Successfully verified, exit the function
       }
     } catch (dnsError: any) {
-      // DNS error - CNAME not found or still propagating
+      // DNS error - TXT record not found or still propagating
       console.log(`[Background Verification] DNS error for ${domain}: ${dnsError.message}`);
     }
     
