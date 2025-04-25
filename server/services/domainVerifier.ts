@@ -4,6 +4,7 @@
  * This service provides real-time domain verification using multiple DNS resolution methods
  * for maximum compatibility and reliability.
  */
+import crypto from 'crypto';
 
 /**
  * Verify a domain's CNAME configuration using multiple DNS providers
@@ -129,6 +130,7 @@ export async function verifyDomainCname(domain: string, cnameTarget: string) {
  * @returns Random CNAME target in format "wick3d-xxxxxxxx.replit.app"
  */
 export function generateCnameTarget(): string {
-  const crypto = require('crypto');
-  return `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
+  // Using Node.js crypto for random bytes
+  const randomHex = crypto.randomBytes(4).toString('hex');
+  return `wick3d-${randomHex}.replit.app`;
 }
