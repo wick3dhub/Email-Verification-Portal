@@ -729,7 +729,7 @@ export default function SettingsForm() {
                             showInstructions: true
                           });
                           
-                          console.log(`DNS instructions set with domain: ${domain} and verification token: ${data.cnameTarget}`);
+                          console.log(`DNS instructions set with domain: ${domain} and verification token: ${data.verificationToken}`);
                           
                           // Start checking the domain in the background
                           startDomainVerificationCheck(domain);

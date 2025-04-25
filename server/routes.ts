@@ -189,7 +189,7 @@ async function verifyDomainInBackground(
     
     // If tracked domain exists, use that information instead
     if (trackedDomain) {
-      console.log(`[Background Verification] Using tracked domain data: ${trackedDomain.domain} with target ${trackedDomain.cnameTarget}`);
+      console.log(`[Background Verification] Using tracked domain data: ${trackedDomain.domain} with verification token ${trackedDomain.verificationToken}`);
       // Use the tracker's CNAME target, but we'll still continue with verification
     } 
     // If it's not the primary domain, find it in the additional domains
