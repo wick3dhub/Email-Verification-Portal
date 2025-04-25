@@ -83,6 +83,14 @@ class DomainTracker {
   }
   
   /**
+   * Mark a domain as verified and handle compatibility with older code
+   * @param domain Domain to mark as verified
+   */
+  markDomainAsVerified(domain: string): void {
+    this.markVerified(domain);
+  }
+  
+  /**
    * Get all tracked domains
    * @returns Array of all tracked domains
    */
