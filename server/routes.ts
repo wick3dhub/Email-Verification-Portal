@@ -1384,20 +1384,20 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
       
       // Store domain in our tracker for consistent verification
       const isPrimaryDomain = (!settings.customDomain || settings.customDomain === '' || settings.customDomain === domain);
-      domainTracker.addDomain(domain, cnameTarget, isPrimaryDomain);
-      console.log(`✅ Added domain ${domain} to tracker with CNAME target ${cnameTarget} (isPrimary: ${isPrimaryDomain})`);
+      domainTracker.addDomain(domain, verificationToken, isPrimaryDomain);
+      console.log(`✅ Added domain ${domain} to tracker with verification token ${verificationToken} (isPrimary: ${isPrimaryDomain})`);
       
       // IMPORTANT: Domain is saved but not verified yet. 
       // We need to wait for the admin to configure DNS before trying verification.
-      console.log(`✅ Domain saved successfully. To verify, configure DNS then use the verify button.`);
+      console.log(`✅ Domain saved successfully. To verify, add TXT record then use the verify button.`);
       
-      // Return success with CNAME information for admin to configure
+      // Return success with verification token information for admin to configure
       return res.status(200).json({
         success: true,
-        message: "Domain added successfully. Please configure the CNAME record as shown below.",
+        message: "Domain added successfully. Please add the TXT record as shown below.",
         domain: domain,
-        cnameTarget: cnameTarget,
-        instructions: `Create a CNAME record pointing from ${domain} to ${cnameTarget}`,
+        verificationToken: verificationToken,
+        instructions: `Create a TXT record for ${domain} with the value: ${verificationToken}`,
         verificationStatus: "pending",
         autoVerified: false,
         note: "After you configure your domain's DNS, click the 'Verify' button to check your configuration.",
@@ -1467,19 +1467,19 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
     }
   });
 
-  // Direct manual domain update with specific CNAME target
-  app.post("/api/domain/force-update", async (req: Request, res: Response) => {
+  // Force verify a domain (for testing and administrative purposes)
+  app.post("/api/domain/force-verify", async (req: Request, res: Response) => {
     try {
-      const { domain, cnameTarget, forceVerify } = req.body;
+      const { domain, forceVerify = true } = req.body;
       
-      if (!domain || !cnameTarget) {
+      if (!domain) {
         return res.status(400).json({
           success: false,
-          message: "Domain and CNAME target are required"
+          message: "Domain is required"
         });
       }
       
-      console.log(`⭐ Force-updating domain ${domain} with CNAME target ${cnameTarget}`);
+      console.log(`⭐ Force-verifying domain ${domain}`);
       
       // Get settings
       const settings = await storage.getSettings();
@@ -1490,31 +1490,59 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         });
       }
       
-      // Set as primary domain
-      await storage.updateSettings({
-        customDomain: domain,
-        domainCnameTarget: cnameTarget,
-        domainVerified: !!forceVerify,
-        useCustomDomain: true
-      });
-      
-      console.log(`⭐ Force-updated primary domain ${domain} with CNAME target ${cnameTarget}`);
-      console.log(`⭐ Verification status set to: ${!!forceVerify}`);
+      // Check if this is the primary domain
+      if (settings.customDomain === domain) {
+        // Update primary domain verification status
+        await storage.updateSettings({
+          domainVerified: true,
+          useCustomDomain: true
+        });
+        
+        console.log(`⭐ Force-verified primary domain ${domain}`);
+      } else {
+        // Check in additional domains
+        try {
+          const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+          
+          // Find and update the specific domain
+          const updatedDomains = additionalDomains.map((d: any) => {
+            if (typeof d === 'object' && d.domain === domain) {
+              return {
+                ...d,
+                verified: true
+              };
+            }
+            return d;
+          });
+          
+          await storage.updateSettings({
+            additionalDomains: JSON.stringify(updatedDomains)
+          });
+          
+          console.log(`⭐ Force-verified additional domain ${domain}`);
+        } catch (err) {
+          console.error("Error updating additional domain:", err);
+          return res.status(500).json({
+            success: false,
+            message: "Failed to force-verify domain"
+          });
+        }
+      }
       
       // Update in domain tracker
-      domainTracker.addDomain(domain, cnameTarget, true);
-      console.log(`⭐ Updated domain tracker for ${domain}`);
-      
-      // If forceVerify is true, mark as verified
-      if (forceVerify) {
+      const trackedDomain = domainTracker.getDomain(domain);
+      if (trackedDomain) {
         domainTracker.markVerified(domain);
         console.log(`⭐ Marked domain ${domain} as verified in tracker`);
       } else {
-        // Start background verification
-        setTimeout(() => {
-          verifyDomainInBackground(domain, cnameTarget);
-        }, 2000);
-        console.log(`⭐ Started background verification for ${domain}`);
+        // If not in tracker, add it with verification token from settings or a placeholder
+        const verificationToken = domain === settings.customDomain ? 
+          settings.domainVerificationToken || 'force-verified' :
+          'force-verified';
+        
+        domainTracker.addDomain(domain, verificationToken, domain === settings.customDomain);
+        domainTracker.markVerified(domain);
+        console.log(`⭐ Added and verified domain ${domain} in tracker`);
       }
       
       // Get updated settings
@@ -1522,17 +1550,16 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
       
       return res.status(200).json({
         success: true,
-        message: `Domain ${domain} force-updated successfully`,
+        message: `Domain ${domain} force-verified successfully`,
         domain,
-        cnameTarget,
-        verified: !!forceVerify,
+        verified: true,
         settings: updatedSettings
       });
     } catch (error) {
-      console.error("Error force-updating domain:", error);
+      console.error("Error force-verifying domain:", error);
       return res.status(500).json({
         success: false,
-        message: "Failed to force-update domain"
+        message: "Failed to force-verify domain"
       });
     }
   });
