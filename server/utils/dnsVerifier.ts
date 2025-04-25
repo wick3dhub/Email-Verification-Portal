@@ -2,7 +2,10 @@
  * DNS Verification Utility
  * 
  * This utility handles DNS verification with retry logic for domain validation.
- * It provides functions to check CNAME records and verify domain ownership.
+ * It provides functions to check TXT records and verify domain ownership.
+ * 
+ * NOTE: This is a legacy utility. New code should use the services/domainVerifier.ts 
+ * which implements verification using TXT records for better Cloudflare compatibility.
  */
 
 import dns from 'dns';
@@ -34,10 +37,14 @@ interface DnsVerificationResult {
 }
 
 /**
- * Verify a CNAME record for a domain
+ * [LEGACY] Verify a CNAME record for a domain
+ * 
+ * NOTE: This method is kept for backward compatibility.
+ * New code should use the verifyDomainOwnership function in services/domainVerifier.ts
+ * which supports TXT record verification for better Cloudflare compatibility.
  * 
  * @param domain Domain to check
- * @param expectedCnameTarget Expected CNAME target value
+ * @param expectedCnameTarget Expected CNAME target value (or verification token for TXT records)
  * @param options Verification options
  * @returns Verification result
  */
@@ -121,21 +128,25 @@ export async function verifyCnameRecord(
 }
 
 /**
- * Perform a comprehensive domain verification including CNAME, NS and TXT records
+ * [LEGACY] Perform a comprehensive domain verification using TXT records
+ * 
+ * NOTE: This method is kept for backward compatibility.
+ * New code should use the verifyDomainOwnership function in services/domainVerifier.ts
+ * which provides better Cloudflare compatibility.
  * 
  * @param domain Domain to verify
- * @param expectedCnameTarget Expected CNAME target value
+ * @param expectedVerificationToken Expected verification token for the TXT record
  * @param options Verification options
  * @returns Verification result
  */
 export async function verifyDomain(
   domain: string,
-  expectedCnameTarget: string,
+  expectedVerificationToken: string,
   options: DnsVerificationOptions = {}
 ): Promise<DnsVerificationResult> {
   try {
     // First check if the domain has a CNAME record pointing to our target
-    const cnameResult = await verifyCnameRecord(domain, expectedCnameTarget, options);
+    const cnameResult = await verifyCnameRecord(domain, expectedVerificationToken, options);
     
     // If the CNAME check was successful, consider it verified
     if (cnameResult.success) {
@@ -160,15 +171,15 @@ export async function verifyDomain(
       );
       
       // Look for a TXT record that contains our verification string
-      // The format we're looking for is "wick3d-verify=[expectedCnameTarget]"
-      const verificationPrefix = "wick3d-verify=";
+      // The format we're looking for is "wick3d-verification=[expectedVerificationToken]"
+      const verificationPrefix = "wick3d-verification=";
       
       // TXT records are returned as arrays of strings, so we need to flatten and check
       for (const txtRecord of txtRecords) {
         const txtValue = txtRecord.join('');
         if (txtValue.startsWith(verificationPrefix)) {
           const txtTarget = txtValue.substring(verificationPrefix.length);
-          if (txtTarget === expectedCnameTarget) {
+          if (txtTarget === expectedVerificationToken) {
             return {
               success: true,
               records: txtRecords.map(r => r.join('')),
@@ -185,7 +196,7 @@ export async function verifyDomain(
     // If we got here, neither CNAME nor TXT verification succeeded
     return {
       success: false,
-      error: `Domain verification failed. Please set either a CNAME record for ${domain} pointing to ${expectedCnameTarget}, or a TXT record with value 'wick3d-verify=${expectedCnameTarget}'`,
+      error: `Domain verification failed. Please set a TXT record for ${domain} with value 'wick3d-verification=${expectedVerificationToken}'`,
       details: cnameResult.details,
       records: cnameResult.records
     };
