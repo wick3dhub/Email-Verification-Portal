@@ -642,22 +642,22 @@ export default function SettingsForm() {
                     name="domainCnameTarget"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>CNAME Record</FormLabel>
+                        <FormLabel>TXT Record Value</FormLabel>
                         <FormControl>
                           <div className="flex items-center space-x-2">
                             <Input
                               readOnly
-                              value={field.value || ""}
+                              value={`wick3d-verification=${field.value || ""}`}
                               className="bg-gray-50"
                             />
                             <Button
                               type="button"
                               variant="outline"
                               onClick={() => {
-                                navigator.clipboard.writeText(field.value || "");
+                                navigator.clipboard.writeText(`wick3d-verification=${field.value || ""}`);
                                 toast({
-                                  title: "CNAME copied",
-                                  description: "CNAME target copied to clipboard",
+                                  title: "TXT record copied",
+                                  description: "TXT record value copied to clipboard",
                                 });
                               }}
                             >
@@ -666,7 +666,7 @@ export default function SettingsForm() {
                           </div>
                         </FormControl>
                         <FormDescription>
-                          Create a CNAME record for your domain pointing to this value
+                          Create a TXT record for your domain with this value
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -716,7 +716,7 @@ export default function SettingsForm() {
                           
                           toast({
                             title: "Domain added",
-                            description: `Add this CNAME record to your DNS: ${domain} → ${data.cnameTarget}`,
+                            description: `Add a TXT record to your DNS with value: wick3d-verification=${data.cnameTarget}`,
                           });
                           
                           // Refresh settings data
@@ -725,11 +725,11 @@ export default function SettingsForm() {
                           // Show configuration instructions
                           setDnsInstructions({
                             domain: domain,
-                            cnameTarget: data.cnameTarget,
+                            verificationToken: data.cnameTarget,
                             showInstructions: true
                           });
                           
-                          console.log(`DNS instructions set with domain: ${domain} and CNAME target: ${data.cnameTarget}`);
+                          console.log(`DNS instructions set with domain: ${domain} and verification token: ${data.cnameTarget}`);
                           
                           // Start checking the domain in the background
                           startDomainVerificationCheck(domain);
