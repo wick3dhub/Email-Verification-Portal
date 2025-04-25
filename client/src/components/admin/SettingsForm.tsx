@@ -54,7 +54,7 @@ const settingsSchema = z.object({
   // Domain settings
   useCustomDomain: z.boolean(),
   customDomain: z.string().optional(),
-  domainCnameTarget: z.string().optional(),
+  domainVerificationToken: z.string().optional(),
   domainVerified: z.boolean(),
   additionalDomains: z.string(),
   // Custom email template settings
@@ -237,7 +237,7 @@ export default function SettingsForm() {
       // Domain settings
       useCustomDomain: false,
       customDomain: "",
-      domainCnameTarget: "",
+      domainVerificationToken: "",
       domainVerified: false,
       additionalDomains: "[]",
       // Email settings defaults
@@ -267,13 +267,13 @@ export default function SettingsForm() {
 
   // Initialize DNS instructions if domain is already set up
   useEffect(() => {
-    if (settings && settings.useCustomDomain && settings.customDomain && settings.domainCnameTarget) {
+    if (settings && settings.useCustomDomain && settings.customDomain && settings.domainVerificationToken) {
       // If domain is verified, just show the success state
       if (!settings.domainVerified) {
         // If domain is set but not verified, show instructions for configuration
         setDnsInstructions({
           domain: settings.customDomain,
-          verificationToken: settings.domainCnameTarget,
+          verificationToken: settings.domainVerificationToken,
           showInstructions: true
         });
         
