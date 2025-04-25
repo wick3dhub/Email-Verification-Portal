@@ -1,10 +1,10 @@
 /**
- * Domain check endpoint for real-time verification
+ * Domain check endpoint for real-time verification using TXT records
  */
 import { Request, Response } from "express";
 import { storage } from "../storage"; 
 import { domainTracker } from "../services/domainTracker";
-import { verifyDomainCname } from "../services/domainVerifier";
+import { verifyDomainOwnership } from "../services/domainVerifier";
 
 export async function handleDomainCheck(req: Request, res: Response) {
   try {
@@ -36,20 +36,20 @@ export async function handleDomainCheck(req: Request, res: Response) {
     
     // Determine domain info (primary or additional)
     let isPrimaryDomain = settings.customDomain === domain;
-    let cnameTarget = settings.domainCnameTarget;
+    let verificationToken = settings.domainVerificationToken; // Using verificationToken instead of cnameTarget
     let domainFound = false;
     
     // Check if it's in domain tracker first (most reliable source)
     const trackedDomain = domainTracker.getDomain(domain);
     if (trackedDomain) {
-      console.log(`🔍 Domain ${domain} found in tracker with CNAME ${trackedDomain.cnameTarget}`);
-      cnameTarget = trackedDomain.cnameTarget;
-      isPrimaryDomain = trackedDomain.isPrimary;
+      console.log(`🔍 Domain ${domain} found in tracker with token ${trackedDomain.verificationToken}`);
+      verificationToken = trackedDomain.verificationToken;
+      isPrimaryDomain = trackedDomain.isPrimary || false;
       domainFound = true;
     }
     // Check if it's the primary domain
     else if (isPrimaryDomain) {
-      console.log(`🔍 Domain ${domain} is the primary domain with CNAME ${cnameTarget}`);
+      console.log(`🔍 Domain ${domain} is the primary domain with verification token ${verificationToken}`);
       domainFound = true;
     }
     // Check in additional domains
@@ -61,8 +61,8 @@ export async function handleDomainCheck(req: Request, res: Response) {
         );
         
         if (additionalDomain) {
-          console.log(`🔍 Domain ${domain} found in additional domains with CNAME ${additionalDomain.cnameTarget}`);
-          cnameTarget = additionalDomain.cnameTarget;
+          console.log(`🔍 Domain ${domain} found in additional domains with token ${additionalDomain.verificationToken}`);
+          verificationToken = additionalDomain.verificationToken;
           domainFound = true;
         }
       } catch (err) {
@@ -79,18 +79,18 @@ export async function handleDomainCheck(req: Request, res: Response) {
       });
     }
     
-    if (!cnameTarget) {
-      console.log(`❌ No CNAME target found for domain ${domain}`);
+    if (!verificationToken) {
+      console.log(`❌ No verification token found for domain ${domain}`);
       return res.status(400).json({
         success: false,
-        message: "No CNAME target found for this domain"
+        message: "No verification token found for this domain"
       });
     }
     
-    console.log(`🔍 Performing real-time verification for ${domain} with target ${cnameTarget}`);
+    console.log(`🔍 Performing real-time verification for ${domain} with token ${verificationToken}`);
     
     // Use our verification service
-    const verificationResult = await verifyDomainCname(domain, cnameTarget);
+    const verificationResult = await verifyDomainOwnership(domain, verificationToken);
     
     // If verified, update domain status
     if (verificationResult.verified) {
@@ -137,7 +137,7 @@ export async function handleDomainCheck(req: Request, res: Response) {
       return res.status(200).json({
         success: true,
         domain,
-        cnameTarget,
+        verificationToken,
         verified: true,
         message: "Domain verified successfully!",
         details: verificationResult.details,
@@ -150,10 +150,10 @@ export async function handleDomainCheck(req: Request, res: Response) {
       return res.status(200).json({
         success: true,
         domain,
-        cnameTarget,
+        verificationToken,
         verified: false,
         message: "Domain verification failed. Please check your DNS settings.",
-        instructions: `Create a CNAME record for ${domain} pointing to ${cnameTarget}. DNS changes can take some time to propagate.`,
+        instructions: `Create a TXT record for ${domain} with the value: ${verificationToken}. DNS changes can take some time to propagate.`,
         details: verificationResult.details
       });
     }

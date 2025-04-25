@@ -10,7 +10,7 @@ import os from "os";
 import type { Setting } from "@shared/schema";
 import { domainTracker } from "./services/domainTracker";
 import { getDomainReputation } from './services/domainReputation';
-import { verifyDomainCname, generateCnameTarget } from './services/domainVerifier';
+import { verifyDomainOwnership, generateVerificationToken } from './services/domainVerifier';
 
 // This file uses the domainTracker service to improve domain verification reliability
 // The tracker ensures domain/CNAME pairs are properly tracked between frontend and backend
@@ -1314,9 +1314,9 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         console.log(`Error logging current domains: ${e}`);
       }
       
-      // Generate a random CNAME target
-      const cnameTarget = generateCnameTarget();
-      console.log(`🌐 Generated CNAME target: ${cnameTarget}`);
+      // Generate a verification token for TXT record
+      const verificationToken = generateVerificationToken(domain);
+      console.log(`🌐 Generated verification token: ${verificationToken}`);
       
       // Check if this is the first domain being added
       if (!settings.customDomain || settings.customDomain === '') {
@@ -1325,7 +1325,7 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         // Update settings with new domain as the primary domain (unverified initially)
         await storage.updateSettings({
           customDomain: domain,
-          domainCnameTarget: cnameTarget,
+          domainVerificationToken: verificationToken, // Use verification token instead of CNAME
           domainVerified: false, // Always start unverified
           useCustomDomain: true
         });
@@ -1333,7 +1333,7 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         // Double-check that domain was stored properly by getting settings again
         const afterUpdate = await storage.getSettings();
         console.log(`✅ Primary domain set to: ${afterUpdate?.customDomain}`);
-        console.log(`✅ Primary domain CNAME set to: ${afterUpdate?.domainCnameTarget}`);
+        console.log(`✅ Primary domain verification token: ${afterUpdate?.domainVerificationToken}`);
         console.log(`✅ Primary domain verified: ${afterUpdate?.domainVerified}`);
       } else {
         // Add as an additional domain
@@ -1351,18 +1351,18 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         );
         
         if (existingDomainIndex >= 0) {
-          // Update existing domain record with new CNAME target
+          // Update existing domain record with new verification token
           additionalDomains[existingDomainIndex] = {
             domain,
-            cnameTarget,
-            verified: false, // Reset verification status with new CNAME
+            verificationToken,
+            verified: false, // Reset verification status with new token
             addedAt: new Date().toISOString()
           };
         } else {
           // Add new domain record
           additionalDomains.push({
             domain,
-            cnameTarget,
+            verificationToken,
             verified: false,
             addedAt: new Date().toISOString()
           });

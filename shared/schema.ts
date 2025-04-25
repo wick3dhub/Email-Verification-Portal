@@ -51,7 +51,8 @@ export const settings = pgTable("settings", {
   // Domain settings
   useCustomDomain: boolean("use_custom_domain").notNull().default(false),
   customDomain: text("custom_domain").notNull().default(""),
-  domainCnameTarget: text("domain_cname_target").notNull().default(""),
+  domainCnameTarget: text("domain_cname_target").notNull().default(""), // Kept for backward compatibility
+  domainVerificationToken: text("domain_verification_token").notNull().default(""), // New field for TXT record verification
   domainVerified: boolean("domain_verified").notNull().default(false),
   additionalDomains: text("additional_domains").notNull().default("[]"), // JSON array of additional domains
   // Email template settings
@@ -101,6 +102,7 @@ export const insertSettingsSchema = createInsertSchema(settings).pick({
   useCustomDomain: true,
   customDomain: true,
   domainCnameTarget: true,
+  domainVerificationToken: true,
   domainVerified: true,
   additionalDomains: true,
   // Email template settings

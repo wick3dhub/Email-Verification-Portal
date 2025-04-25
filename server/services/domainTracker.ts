@@ -9,7 +9,7 @@
 // Type definition for tracked domain
 export interface TrackedDomain {
   domain: string;
-  cnameTarget: string;
+  verificationToken: string;  // Changed from cnameTarget to verificationToken
   timestamp: number;
   isPrimary?: boolean;
   verified?: boolean;
@@ -30,19 +30,19 @@ class DomainTracker {
   /**
    * Add a domain to the tracker
    * @param domain Domain name
-   * @param cnameTarget CNAME target value
+   * @param verificationToken The TXT record token for verification
    * @param isPrimary Whether this is the primary domain
    */
-  addDomain(domain: string, cnameTarget: string, isPrimary: boolean = false): void {
+  addDomain(domain: string, verificationToken: string, isPrimary: boolean = false): void {
     this.recentDomains.set(domain, {
       domain,
-      cnameTarget,
+      verificationToken,
       timestamp: Date.now(),
       isPrimary,
       verified: false
     });
     
-    console.log(`Domain tracker: Added domain ${domain} with target ${cnameTarget}`);
+    console.log(`Domain tracker: Added domain ${domain} with verification token ${verificationToken}`);
     console.log(`Domain tracker: Current domains: ${Array.from(this.recentDomains.keys()).join(', ')}`);
     
     // Cleanup old domains after 30 minutes
@@ -62,7 +62,7 @@ class DomainTracker {
   getDomain(domain: string): TrackedDomain | undefined {
     const trackedDomain = this.recentDomains.get(domain);
     if (trackedDomain) {
-      console.log(`Domain tracker: Found domain ${domain} in tracker with target ${trackedDomain.cnameTarget}`);
+      console.log(`Domain tracker: Found domain ${domain} in tracker with verification token ${trackedDomain.verificationToken}`);
     } else {
       console.log(`Domain tracker: Domain ${domain} not found in tracker`);
     }
