@@ -93,21 +93,21 @@ async function checkCnameRecords(domain: string, cnameTarget: string) {
     }
   }
   
-  // Log all CNAME records found
-  console.log(`🔍 All CNAME records for ${domain}:`, cnameRecords);
+  // Log all TXT records found
+  console.log(`🔍 All TXT records for ${domain}:`, txtRecords);
   
-  // Check if any of the CNAME records match our target
-  verified = cnameRecords.some(record => {
+  // Check if any of the TXT records match our verification token
+  verified = txtRecords.some(record => {
     // Compare normalized records (no trailing dots, lowercase)
-    const normalizedRecord = record.toLowerCase().replace(/\.$/, '');
-    const normalizedTarget = cnameTarget.toLowerCase().replace(/\.$/, '');
+    const normalizedRecord = Array.isArray(record) ? record.join('').toLowerCase() : record.toLowerCase();
+    const normalizedToken = verificationToken.toLowerCase();
     
     // Flexible matching - accept partial matches
-    const isExactMatch = normalizedRecord === normalizedTarget;
-    const isPartialMatch = normalizedRecord.includes(normalizedTarget) || 
-                          normalizedTarget.includes(normalizedRecord);
+    const isExactMatch = normalizedRecord === normalizedToken;
+    const isPartialMatch = normalizedRecord.includes(normalizedToken) || 
+                          normalizedToken.includes(normalizedRecord);
     
-    console.log(`🔍 Comparing: [${normalizedRecord}] with target [${normalizedTarget}]:`);
+    console.log(`🔍 Comparing: [${normalizedRecord}] with token [${normalizedToken}]:`);
     console.log(`🔍 - Exact match: ${isExactMatch}`);
     console.log(`🔍 - Partial match: ${isPartialMatch}`);
     
@@ -134,21 +134,21 @@ async function checkCnameRecords(domain: string, cnameTarget: string) {
 
 /**
  * Background verification for domains
- * Attempts to verify a domain's CNAME record repeatedly without blocking the user
+ * Attempts to verify a domain's TXT record repeatedly without blocking the user
  * @param domain Domain to verify
- * @param cnameTarget Expected CNAME target value
+ * @param verificationToken Expected TXT record verification token
  * @param attempts Current attempt count (used for recursion)
  * @param maxAttempts Maximum number of verification attempts
  * @param delayMs Delay between verification attempts in milliseconds
  */
 async function verifyDomainInBackground(
   domain: string, 
-  cnameTarget: string, 
+  verificationToken: string, 
   attempts: number = 0, 
   maxAttempts: number = 30, 
   delayMs: number = 20000 // Default 20s between attempts
 ) {
-  console.log(`[Background Verification] Starting for domain ${domain} with target ${cnameTarget} (attempt ${attempts+1}/${maxAttempts})`);
+  console.log(`[Background Verification] Starting for domain ${domain} with verification token ${verificationToken} (attempt ${attempts+1}/${maxAttempts})`);
   // Skip if reached max attempts
   if (attempts >= maxAttempts) {
     console.log(`Maximum verification attempts (${maxAttempts}) reached for domain: ${domain}`);
@@ -289,7 +289,7 @@ async function verifyDomainInBackground(
             console.log(`[Background Verification] Domain ${domain} not found in additional domains, adding it`);
             updatedDomains.push({
               domain,
-              cnameTarget,
+              verificationToken,
               verified: true,
               verifiedAt: new Date().toISOString(),
               addedAt: new Date().toISOString()
@@ -338,14 +338,14 @@ async function verifyDomainInBackground(
     console.log(`[Background Verification] Will try again in ${nextDelay / 1000}s`);
     
     setTimeout(() => {
-      verifyDomainInBackground(domain, cnameTarget, attempts + 1, maxAttempts, nextDelay);
+      verifyDomainInBackground(domain, verificationToken, attempts + 1, maxAttempts, nextDelay);
     }, delayMs);
   } catch (error) {
     console.error(`[Background Verification] Error verifying domain ${domain}:`, error);
     
     // Continue with retry despite error
     setTimeout(() => {
-      verifyDomainInBackground(domain, cnameTarget, attempts + 1, maxAttempts, delayMs);
+      verifyDomainInBackground(domain, verificationToken, attempts + 1, maxAttempts, delayMs);
     }, delayMs);
   }
 }
