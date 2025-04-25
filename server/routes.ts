@@ -211,14 +211,16 @@ async function verifyDomainInBackground(
       if (domainInfo.verified) {
         console.log(`Domain ${domain} is already verified in database settings`);
         // Add to tracker as verified
-        domainTracker.addDomain(domain, domainInfo.cnameTarget, false);
+        const verificationToken = domainInfo.verificationToken || domainInfo.cnameTarget; // Support both formats
+        domainTracker.addDomain(domain, verificationToken, false);
         domainTracker.markVerified(domain);
         return;
       }
       
       // Make sure this domain is in our tracker
       if (!trackedDomain) {
-        domainTracker.addDomain(domain, domainInfo.cnameTarget, false);
+        const verificationToken = domainInfo.verificationToken || domainInfo.cnameTarget; // Support both formats
+        domainTracker.addDomain(domain, verificationToken, false);
         console.log(`[Background Verification] Added domain ${domain} to tracker from additional domains`);
       }
     } else if (settings.domainVerified) {
@@ -226,14 +228,16 @@ async function verifyDomainInBackground(
       console.log(`Primary domain ${domain} is already verified in database settings`);
       // Add to tracker as verified if not already there
       if (!trackedDomain) {
-        domainTracker.addDomain(domain, cnameTarget, true);
+        const verificationToken = settings.domainVerificationToken || settings.domainCnameTarget || 'verified'; // Support both formats
+        domainTracker.addDomain(domain, verificationToken, true);
         domainTracker.markVerified(domain);
         console.log(`[Background Verification] Added verified primary domain ${domain} to tracker`);
       }
       return;
     } else if (!trackedDomain) {
       // Primary domain but not verified and not in tracker yet
-      domainTracker.addDomain(domain, cnameTarget, true);
+      const verificationToken = settings.domainVerificationToken || settings.domainCnameTarget || 'pending-verification'; // Support both formats
+      domainTracker.addDomain(domain, verificationToken, true);
       console.log(`[Background Verification] Added primary domain ${domain} to tracker`);
     }
     
@@ -401,7 +405,8 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
         if (requestedDomain) {
           // Add to tracker if not already there
           if (!trackedDomain) {
-            domainTracker.addDomain(requestedDomain.domain, requestedDomain.cnameTarget, false);
+            const verificationToken = requestedDomain.verificationToken || requestedDomain.cnameTarget || 'verified-domain';
+            domainTracker.addDomain(requestedDomain.domain, verificationToken, false);
             domainTracker.markVerified(requestedDomain.domain);
           }
           return requestedDomain.domain;
@@ -467,11 +472,12 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
     const settings = await storage.getSettings();
     if (settings) {
       // Add primary domain if it exists
-      if (settings.customDomain && settings.domainCnameTarget) {
+      if (settings.customDomain) {
         console.log(`Adding primary domain to tracker: ${settings.customDomain}`);
+        const verificationToken = settings.domainVerificationToken || settings.domainCnameTarget || 'primary-domain';
         domainTracker.addDomain(
           settings.customDomain, 
-          settings.domainCnameTarget, 
+          verificationToken, 
           true
         );
         
@@ -488,11 +494,12 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         if (additionalDomains && additionalDomains.length) {
           console.log(`Found ${additionalDomains.length} additional domains to add to tracker`);
           for (const domain of additionalDomains) {
-            if (domain && domain.domain && domain.cnameTarget) {
+            if (domain && domain.domain) {
               console.log(`Adding additional domain to tracker: ${domain.domain}`);
+              const verificationToken = domain.verificationToken || domain.cnameTarget || 'additional-domain';
               domainTracker.addDomain(
                 domain.domain, 
-                domain.cnameTarget, 
+                verificationToken, 
                 false
               );
               
