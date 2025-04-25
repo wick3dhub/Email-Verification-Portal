@@ -1361,6 +1361,76 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
     }
   });
 
+  // Direct manual domain update with specific CNAME target
+  app.post("/api/domain/force-update", async (req: Request, res: Response) => {
+    try {
+      const { domain, cnameTarget, forceVerify } = req.body;
+      
+      if (!domain || !cnameTarget) {
+        return res.status(400).json({
+          success: false,
+          message: "Domain and CNAME target are required"
+        });
+      }
+      
+      console.log(`⭐ Force-updating domain ${domain} with CNAME target ${cnameTarget}`);
+      
+      // Get settings
+      const settings = await storage.getSettings();
+      if (!settings) {
+        return res.status(404).json({
+          success: false,
+          message: "Settings not found"
+        });
+      }
+      
+      // Set as primary domain
+      await storage.updateSettings({
+        customDomain: domain,
+        domainCnameTarget: cnameTarget,
+        domainVerified: !!forceVerify,
+        useCustomDomain: true
+      });
+      
+      console.log(`⭐ Force-updated primary domain ${domain} with CNAME target ${cnameTarget}`);
+      console.log(`⭐ Verification status set to: ${!!forceVerify}`);
+      
+      // Update in domain tracker
+      domainTracker.addDomain(domain, cnameTarget, true);
+      console.log(`⭐ Updated domain tracker for ${domain}`);
+      
+      // If forceVerify is true, mark as verified
+      if (forceVerify) {
+        domainTracker.markVerified(domain);
+        console.log(`⭐ Marked domain ${domain} as verified in tracker`);
+      } else {
+        // Start background verification
+        setTimeout(() => {
+          verifyDomainInBackground(domain, cnameTarget);
+        }, 2000);
+        console.log(`⭐ Started background verification for ${domain}`);
+      }
+      
+      // Get updated settings
+      const updatedSettings = await storage.getSettings();
+      
+      return res.status(200).json({
+        success: true,
+        message: `Domain ${domain} force-updated successfully`,
+        domain,
+        cnameTarget,
+        verified: !!forceVerify,
+        settings: updatedSettings
+      });
+    } catch (error) {
+      console.error("Error force-updating domain:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to force-update domain"
+      });
+    }
+  });
+
   // Update domain CNAME target - for use with curl or API clients
   app.post("/api/domain/update-cname", async (req: Request, res: Response) => {
     try {
