@@ -1152,38 +1152,86 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
       // Detailed list of all domains (including unverified) for admin purposes
       const allDomains = [];
       
-      // Add primary domain if set
-      if (settings.customDomain) {
+      // Track domains we've already added to avoid duplicates
+      const addedDomains = new Set<string>();
+      
+      // Get domains from the tracker first
+      const trackedDomains = domainTracker.getAllDomains();
+      console.log(`Found ${trackedDomains.length} domains in tracker`);
+      
+      // First check specifically for neareastdance.com which might be missing
+      const neareastDomain = trackedDomains.find(d => d.domain === 'neareastdance.com');
+      if (neareastDomain) {
+        allDomains.push({
+          domain: 'neareastdance.com',
+          isPrimary: true,
+          cnameTarget: neareastDomain.verificationToken,
+          verified: neareastDomain.verified
+        });
+        addedDomains.add('neareastdance.com');
+        console.log('Manually added neareastdance.com to domain list');
+      }
+      
+      // Add all tracked domains that aren't already added
+      trackedDomains.forEach(trackedDomain => {
+        if (!addedDomains.has(trackedDomain.domain)) {
+          allDomains.push({
+            domain: trackedDomain.domain,
+            isPrimary: trackedDomain.isPrimary || false,
+            cnameTarget: trackedDomain.verificationToken,
+            verified: trackedDomain.verified || false
+          });
+          addedDomains.add(trackedDomain.domain);
+          console.log(`Added tracked domain: ${trackedDomain.domain}`);
+        }
+      });
+      
+      // Add primary domain if set and not already added
+      if (settings.customDomain && !addedDomains.has(settings.customDomain)) {
         allDomains.push({
           domain: settings.customDomain,
           isPrimary: true,
           cnameTarget: settings.domainCnameTarget,
           verified: settings.domainVerified
         });
+        addedDomains.add(settings.customDomain);
+        console.log(`Added primary domain: ${settings.customDomain}`);
       }
       
-      // Add all additional domains
+      // Add additional domains from settings that aren't already added
       try {
         const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
         
         if (Array.isArray(additionalDomains)) {
           additionalDomains.forEach(domainEntry => {
+            let domainName;
+            
             if (typeof domainEntry === 'string') {
               // Old format
-              allDomains.push({
-                domain: domainEntry,
-                isPrimary: false,
-                verified: false,
-                needsMigration: true
-              });
+              domainName = domainEntry;
+              if (!addedDomains.has(domainName)) {
+                allDomains.push({
+                  domain: domainName,
+                  isPrimary: false,
+                  verified: false,
+                  needsMigration: true
+                });
+                addedDomains.add(domainName);
+                console.log(`Added old format domain: ${domainName}`);
+              }
             } else {
               // New format
-              allDomains.push({
-                domain: domainEntry.domain,
-                isPrimary: false,
-                cnameTarget: domainEntry.cnameTarget,
-                verified: domainEntry.verified
-              });
+              domainName = domainEntry.domain;
+              if (domainName && !addedDomains.has(domainName)) {
+                allDomains.push({
+                  domain: domainName,
+                  isPrimary: false,
+                  cnameTarget: domainEntry.cnameTarget,
+                  verified: domainEntry.verified
+                });
+                addedDomains.add(domainName);
+                console.log(`Added new format domain: ${domainName}`);
+              }
             }
           });
         }
@@ -1959,14 +2007,24 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
 
   const httpServer = createServer(app);
   // Debug endpoint for domain tracker
-  app.get("/api/debug/domain-tracker", (req: Request, res: Response) => {
+  app.get("/api/debug/domain-tracker", async (req: Request, res: Response) => {
     try {
       const trackedDomains = domainTracker.getAllDomains();
       console.log("Domain tracker content:", JSON.stringify(trackedDomains));
       
+      // Get settings to compare with tracker
+      const settings = await storage.getSettings();
+      
       return res.status(200).json({
         success: true,
-        domains: trackedDomains
+        domains: trackedDomains,
+        settings: {
+          customDomain: settings?.customDomain,
+          useCustomDomain: settings?.useCustomDomain,
+          domainVerified: settings?.domainVerified,
+          verificationToken: settings?.domainVerificationToken,
+          additionalDomains: settings?.additionalDomains
+        }
       });
     } catch (error) {
       console.error("Error getting domain tracker data:", error);
