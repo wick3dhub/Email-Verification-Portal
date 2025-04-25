@@ -1361,6 +1361,114 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
     }
   });
 
+  // Update domain CNAME target
+  app.post("/api/domain/update-cname", async (req: Request, res: Response) => {
+    try {
+      const { domain, cnameTarget } = req.body;
+      
+      if (!domain || !cnameTarget) {
+        return res.status(400).json({
+          success: false,
+          message: "Domain and CNAME target are required"
+        });
+      }
+      
+      console.log(`Updating CNAME target for domain ${domain} to ${cnameTarget}`);
+      
+      // Get settings
+      const settings = await storage.getSettings();
+      if (!settings) {
+        return res.status(404).json({
+          success: false,
+          message: "Settings not found"
+        });
+      }
+      
+      // Check if this is the primary domain
+      const isPrimaryDomain = settings.customDomain === domain;
+      
+      if (isPrimaryDomain) {
+        // Update primary domain CNAME target
+        await storage.updateSettings({
+          domainCnameTarget: cnameTarget
+        });
+        
+        console.log(`Updated primary domain ${domain} CNAME target to ${cnameTarget}`);
+      } else {
+        // Update additional domain CNAME target
+        try {
+          const additionalDomains = JSON.parse(settings.additionalDomains || '[]');
+          const domainExists = additionalDomains.some((d: any) => d.domain === domain);
+          
+          if (!domainExists) {
+            return res.status(404).json({
+              success: false,
+              message: "Domain not found in additional domains"
+            });
+          }
+          
+          const updatedDomains = additionalDomains.map((d: any) => {
+            if (d.domain === domain) {
+              return {
+                ...d,
+                cnameTarget
+              };
+            }
+            return d;
+          });
+          
+          await storage.updateSettings({
+            additionalDomains: JSON.stringify(updatedDomains)
+          });
+          
+          console.log(`Updated additional domain ${domain} CNAME target to ${cnameTarget}`);
+        } catch (err) {
+          console.error("Error updating additional domain CNAME target:", err);
+          return res.status(500).json({
+            success: false,
+            message: "Failed to update domain CNAME target"
+          });
+        }
+      }
+      
+      // Update domain tracker
+      const trackedDomain = domainTracker.getDomain(domain);
+      if (trackedDomain) {
+        // Update in tracker
+        domainTracker.addDomain(domain, cnameTarget, isPrimaryDomain);
+        console.log(`Updated domain tracker for ${domain} with new CNAME target ${cnameTarget}`);
+      } else {
+        // Add to tracker if not already there
+        domainTracker.addDomain(domain, cnameTarget, isPrimaryDomain);
+        console.log(`Added domain ${domain} to tracker with CNAME target ${cnameTarget}`);
+      }
+      
+      // Start background verification with the new CNAME target
+      setTimeout(() => {
+        verifyDomainInBackground(domain, cnameTarget);
+      }, 2000);
+      
+      // Force verification in dev mode to bypass DNS issues
+      let forceVerify = process.env.NODE_ENV === 'development';
+      
+      return res.status(200).json({
+        success: true,
+        message: "Domain CNAME target updated successfully",
+        domain,
+        cnameTarget,
+        isPrimaryDomain,
+        verificationInProgress: true,
+        forceVerify
+      });
+    } catch (error) {
+      console.error("Error updating domain CNAME target:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update domain CNAME target"
+      });
+    }
+  });
+
   app.post("/api/domain/check", async (req: Request, res: Response) => {
     try {
       const { domain, recentlyAddedDomain, recentlyCnameTarget } = req.body;
