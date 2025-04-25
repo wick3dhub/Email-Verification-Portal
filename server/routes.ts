@@ -10,6 +10,7 @@ import os from "os";
 import type { Setting } from "@shared/schema";
 import { domainTracker } from "./services/domainTracker";
 import { getDomainReputation } from './services/domainReputation';
+import { verifyDomainCname, generateCnameTarget } from './services/domainVerifier';
 
 // This file uses the domainTracker service to improve domain verification reliability
 // The tracker ensures domain/CNAME pairs are properly tracked between frontend and backend
@@ -457,6 +458,8 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
     return req.get('host') || 'localhost:5000';
   }
 }
+
+import { handleDomainCheck } from "./routes/domainCheck";
 
 export async function registerRoutes(app: Express, requireAuth?: (req: Request, res: Response, next: NextFunction) => Promise<void>): Promise<Server> {
   // Initialize domain tracker with existing domains from database
@@ -1264,10 +1267,10 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
   
 
 
-  // Add domain endpoint - adds the domain and allows specifying a CNAME target
+  // Add domain endpoint - adds the domain and generates a random CNAME target
   app.post("/api/domain/add", async (req: Request, res: Response) => {
     try {
-      const { domain, existingCnameTarget } = req.body;
+      const { domain } = req.body;
       
       if (!domain) {
         console.log("Domain add error: No domain provided");
@@ -1277,11 +1280,11 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         });
       }
       
-      console.log(`Adding domain: ${domain} ${existingCnameTarget ? `with existing CNAME: ${existingCnameTarget}` : ''}`);
+      console.log(`🌐 Adding domain: ${domain}`);
       
       // Simple domain validation
       if (!domain.match(/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/)) {
-        console.log(`Domain validation failed for: ${domain}`);
+        console.log(`❌ Domain validation failed for: ${domain}`);
         return res.status(400).json({
           success: false,
           message: "Invalid domain format"
@@ -1292,7 +1295,7 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
       const settings = await storage.getSettings();
       
       if (!settings) {
-        console.log("Domain add error: No settings found in database");
+        console.log("❌ Domain add error: No settings found in database");
         return res.status(404).json({ 
           success: false,
           message: "Settings not found" 
@@ -1301,41 +1304,37 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
       
       // Log current domains before adding
       try {
-        console.log(`Current primary domain: "${settings.customDomain}"`);
-        console.log(`Current CNAME target: "${settings.domainCnameTarget}"`);
-        console.log(`Domain verification status: ${settings.domainVerified}`);
+        console.log(`🌐 Current primary domain: "${settings.customDomain}"`);
+        console.log(`🌐 Current CNAME target: "${settings.domainCnameTarget}"`);
+        console.log(`🌐 Domain verification status: ${settings.domainVerified}`);
         
         const additionalDomainsRaw = settings.additionalDomains || '[]';
-        console.log(`Additional domains before adding: ${additionalDomainsRaw}`);
+        console.log(`🌐 Additional domains before adding: ${additionalDomainsRaw}`);
       } catch (e) {
         console.log(`Error logging current domains: ${e}`);
       }
       
-      // Use provided CNAME target or generate a new one
-      const cnameTarget = existingCnameTarget || `wick3d-${crypto.randomBytes(4).toString('hex')}.replit.app`;
-      console.log(`${existingCnameTarget ? 'Using existing' : 'Generated'} CNAME target: ${cnameTarget}`);
-      
-      // Handle auto-verification for development mode
-      const forceVerify = process.env.NODE_ENV === 'development' && existingCnameTarget;
-      console.log(`Development mode with existing CNAME: ${!!forceVerify}`);
+      // Generate a random CNAME target
+      const cnameTarget = generateCnameTarget();
+      console.log(`🌐 Generated CNAME target: ${cnameTarget}`);
       
       // Check if this is the first domain being added
       if (!settings.customDomain || settings.customDomain === '') {
-        console.log(`Adding as primary domain: ${domain}`);
+        console.log(`🌐 Adding as primary domain: ${domain}`);
         
-        // Update settings with new domain as the primary domain
+        // Update settings with new domain as the primary domain (unverified initially)
         await storage.updateSettings({
           customDomain: domain,
           domainCnameTarget: cnameTarget,
-          domainVerified: forceVerify, // Auto-verify in dev mode with existing CNAME
+          domainVerified: false, // Always start unverified
           useCustomDomain: true
         });
         
         // Double-check that domain was stored properly by getting settings again
         const afterUpdate = await storage.getSettings();
-        console.log(`Primary domain set to: ${afterUpdate?.customDomain}`);
-        console.log(`Primary domain CNAME set to: ${afterUpdate?.domainCnameTarget}`);
-        console.log(`Primary domain verified: ${afterUpdate?.domainVerified}`);
+        console.log(`✅ Primary domain set to: ${afterUpdate?.customDomain}`);
+        console.log(`✅ Primary domain CNAME set to: ${afterUpdate?.domainCnameTarget}`);
+        console.log(`✅ Primary domain verified: ${afterUpdate?.domainVerified}`);
       } else {
         // Add as an additional domain
         let additionalDomains = [];
@@ -1352,11 +1351,11 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         );
         
         if (existingDomainIndex >= 0) {
-          // Update existing domain record
+          // Update existing domain record with new CNAME target
           additionalDomains[existingDomainIndex] = {
             domain,
             cnameTarget,
-            verified: forceVerify, // Auto-verify in dev mode with existing CNAME
+            verified: false, // Reset verification status with new CNAME
             addedAt: new Date().toISOString()
           };
         } else {
@@ -1364,7 +1363,7 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
           additionalDomains.push({
             domain,
             cnameTarget,
-            verified: forceVerify, // Auto-verify in dev mode with existing CNAME
+            verified: false,
             addedAt: new Date().toISOString()
           });
         }
@@ -1377,21 +1376,20 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         
         // Double-check that additional domains were stored properly
         const afterUpdate = await storage.getSettings();
-        console.log(`Additional domains updated: ${afterUpdate?.additionalDomains}`);
+        console.log(`✅ Additional domains updated: ${afterUpdate?.additionalDomains}`);
       }
       
-      // Return updated settings
+      // Get updated settings
       const finalSettings = await storage.getSettings();
       
       // Store domain in our tracker for consistent verification
       const isPrimaryDomain = (!settings.customDomain || settings.customDomain === '' || settings.customDomain === domain);
       domainTracker.addDomain(domain, cnameTarget, isPrimaryDomain);
-      console.log(`Added domain ${domain} to tracker with CNAME target ${cnameTarget} (isPrimary: ${isPrimaryDomain})`);
+      console.log(`✅ Added domain ${domain} to tracker with CNAME target ${cnameTarget} (isPrimary: ${isPrimaryDomain})`);
       
-      // IMPORTANT: We're not starting verification automatically. 
-      // The frontend will need to explicitly call /api/domain/check or the force-update endpoint
-      // This ensures domains are fully saved before verification begins
-      console.log(`Domain saved successfully. Manual verification check will be needed.`);
+      // IMPORTANT: Domain is saved but not verified yet. 
+      // We need to wait for the admin to configure DNS before trying verification.
+      console.log(`✅ Domain saved successfully. To verify, configure DNS then use the verify button.`);
       
       // Return success with CNAME information for admin to configure
       return res.status(200).json({
@@ -1400,11 +1398,9 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         domain: domain,
         cnameTarget: cnameTarget,
         instructions: `Create a CNAME record pointing from ${domain} to ${cnameTarget}`,
-        verificationStatus: forceVerify ? "verified" : "pending",
-        autoVerified: forceVerify,
-        note: forceVerify ? 
-          "Domain was automatically verified in development mode." : 
-          "Domain verification will happen automatically in the background. You can continue adding more domains.",
+        verificationStatus: "pending",
+        autoVerified: false,
+        note: "After you configure your domain's DNS, click the 'Verify' button to check your configuration.",
         settings: finalSettings // Include updated settings so frontend can use this data
       });
     } catch (error) {
