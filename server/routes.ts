@@ -13,82 +13,82 @@ import { getDomainReputation } from './services/domainReputation';
 import { verifyDomainOwnership, generateVerificationToken } from './services/domainVerifier';
 
 // This file uses the domainTracker service to improve domain verification reliability
-// The tracker ensures domain/CNAME pairs are properly tracked between frontend and backend
+// The tracker ensures domain/verification-token pairs are properly tracked between frontend and backend
 // throughout the verification process, regardless of database sync timing.
 
 // Define interface for domain objects
 interface DomainInfo {
   domain: string;
-  cnameTarget: string;
+  verificationToken: string;
   verified: boolean;
 }
 
-// Helper function to check CNAME records using multiple DNS providers
-async function checkCnameRecords(domain: string, cnameTarget: string) {
+// Helper function to check TXT records using multiple DNS providers
+async function checkTxtRecords(domain: string, verificationToken: string) {
   const dns = await import('dns');
   const util = await import('util');
-  const resolveCname = util.promisify(dns.resolveCname);
+  const resolveTxt = util.promisify(dns.resolveTxt);
   
-  let cnameRecords: string[] = [];
+  let txtRecords: string[][] = [];
   const errorMessages: string[] = [];
   let verified = false;
   
-  // Method 1: Standard Node.js DNS resolution
+  // Method 1: Standard Node.js DNS resolution for TXT records
   try {
-    console.log(`🔍 Method 1: Resolving CNAME records using Node DNS for: ${domain}`);
-    cnameRecords = await resolveCname(domain);
-    console.log(`🔍 DNS resolution result for ${domain}:`, cnameRecords);
+    console.log(`🔍 Method 1: Resolving TXT records using Node DNS for: ${domain}`);
+    txtRecords = await resolveTxt(domain);
+    console.log(`🔍 DNS TXT record resolution result for ${domain}:`, txtRecords);
   } catch (nodeErr: any) {
-    console.log(`🔍 Node DNS resolution failed for ${domain}: ${nodeErr.message}`);
+    console.log(`🔍 Node DNS TXT resolution failed for ${domain}: ${nodeErr.message}`);
     errorMessages.push(`Node DNS resolution: ${nodeErr.message}`);
   }
   
   // Method 2: Public DNS API - Google DNS API
-  if (cnameRecords.length === 0) {
+  if (txtRecords.length === 0) {
     try {
-      console.log(`🔍 Method 2: Trying Google DNS API for ${domain}...`);
-      const response = await fetch(`https://dns.google/resolve?name=${domain}&type=CNAME`);
+      console.log(`🔍 Method 2: Trying Google DNS API for TXT records of ${domain}...`);
+      const response = await fetch(`https://dns.google/resolve?name=${domain}&type=TXT`);
       const dnsData = await response.json();
       
       if (dnsData.Answer && dnsData.Answer.length > 0) {
         const googleRecords = dnsData.Answer
-          .filter((record: any) => record.type === 5) // Type 5 is CNAME
-          .map((record: any) => record.data.replace(/\.$/, '')); // Remove trailing dot
+          .filter((record: any) => record.type === 16) // Type 16 is TXT
+          .map((record: any) => [record.data.replace(/\.$/, '').replace(/^"(.*)"$/, '$1')]); // Remove trailing dot and quotes
           
-        console.log(`🔍 Google DNS API records for ${domain}:`, googleRecords);
+        console.log(`🔍 Google DNS API TXT records for ${domain}:`, googleRecords);
         
         if (googleRecords.length > 0) {
-          cnameRecords = googleRecords;
+          txtRecords = googleRecords;
         }
       }
     } catch (googleErr: any) {
-      console.log(`🔍 Google DNS API check failed: ${googleErr.message}`);
+      console.log(`🔍 Google DNS API TXT check failed: ${googleErr.message}`);
       errorMessages.push(`Google DNS API: ${googleErr.message}`);
     }
   }
   
   // Method 3: CloudFlare DNS API (as a backup)
-  if (cnameRecords.length === 0) {
+  if (txtRecords.length === 0) {
     try {
-      console.log(`🔍 Method 3: Trying Cloudflare DNS API for ${domain}...`);
-      const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${domain}&type=CNAME`, {
+      console.log(`🔍 Method 3: Trying Cloudflare DNS API for TXT records of ${domain}...`);
+      const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${domain}&type=TXT`, {
         headers: { 'Accept': 'application/dns-json' }
       });
       const dnsData = await response.json();
       
       if (dnsData.Answer && dnsData.Answer.length > 0) {
         const cloudflareRecords = dnsData.Answer
-          .filter((record: any) => record.type === 5) // Type 5 is CNAME
-          .map((record: any) => record.data.replace(/\.$/, '')); // Remove trailing dot
+          .filter((record: any) => record.type === 16) // Type 16 is TXT
+          .map((record: any) => [record.data.replace(/\.$/, '').replace(/^"(.*)"$/, '$1')]); // Remove trailing dot and quotes
           
-        console.log(`🔍 Cloudflare DNS API records for ${domain}:`, cloudflareRecords);
+        console.log(`🔍 Cloudflare DNS API TXT records for ${domain}:`, cloudflareRecords);
         
         if (cloudflareRecords.length > 0) {
-          cnameRecords = cloudflareRecords;
+          txtRecords = cloudflareRecords;
         }
       }
     } catch (cfErr: any) {
-      console.log(`🔍 Cloudflare DNS API check failed: ${cfErr.message}`);
+      console.log(`🔍 Cloudflare DNS API TXT check failed: ${cfErr.message}`);
       errorMessages.push(`Cloudflare DNS API: ${cfErr.message}`);
     }
   }
@@ -118,11 +118,11 @@ async function checkCnameRecords(domain: string, cnameTarget: string) {
   
   return {
     verified,
-    records: cnameRecords,
+    records: txtRecords,
     errors: errorMessages,
     details: {
-      foundRecords: cnameRecords,
-      expectedTarget: cnameTarget,
+      foundRecords: txtRecords,
+      expectedToken: verificationToken,
       methods: [
         { name: 'Node.js DNS', successful: errorMessages.length === 0 || errorMessages[0].includes('Node DNS') === false },
         { name: 'Google DNS API', successful: errorMessages.length <= 1 || errorMessages[1].includes('Google DNS') === false },
