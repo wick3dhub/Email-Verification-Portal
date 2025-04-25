@@ -1958,5 +1958,24 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
   });
 
   const httpServer = createServer(app);
+  // Debug endpoint for domain tracker
+  app.get("/api/debug/domain-tracker", (req: Request, res: Response) => {
+    try {
+      const trackedDomains = domainTracker.getAllDomains();
+      console.log("Domain tracker content:", JSON.stringify(trackedDomains));
+      
+      return res.status(200).json({
+        success: true,
+        domains: trackedDomains
+      });
+    } catch (error) {
+      console.error("Error getting domain tracker data:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Error retrieving domain tracker data"
+      });
+    }
+  });
+
   return httpServer;
 }
