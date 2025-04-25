@@ -241,34 +241,23 @@ async function verifyDomainInBackground(
       console.log(`[Background Verification] Added primary domain ${domain} to tracker`);
     }
     
-    // Use DNS module to check CNAME record
-    const dns = await import('dns');
-    const util = await import('util');
-    const resolveCname = util.promisify(dns.resolveCname);
-    
+    // Import domain verifier service
+    const { verifyDomainOwnership } = await import('./services/domainVerifier');
+    const trackedDomainInfo = trackedDomain || domainTracker.getDomain(domain);
+    const verificationToken = trackedDomainInfo?.verificationToken || 'wick3d-verification=unknown';
+
     try {
-      // Check if CNAME record has been configured correctly
-      console.log(`[Background Verification] Attempting DNS lookup for ${domain} to find CNAME records...`);
-      const cnameRecords = await resolveCname(domain);
+      // Check domain ownership using TXT record verification
+      console.log(`[Background Verification] Attempting domain verification for ${domain} using token ${verificationToken}...`);
+      const verificationResult = await verifyDomainOwnership(domain, verificationToken);
       
-      console.log(`[Background Verification] DNS lookup results for ${domain}:`, cnameRecords);
+      console.log(`[Background Verification] Verification results for ${domain}:`, {
+        verified: verificationResult.verified,
+        foundRecords: verificationResult.records
+      });
       
-      let verified = false;
-      if (cnameRecords && cnameRecords.length > 0) {
-        // Check if any of the CNAME records match our target
-        console.log(`[Background Verification] Checking if CNAME records match target ${cnameTarget}`);
-        
-        for (const record of cnameRecords) {
-          console.log(`[Background Verification] Comparing: "${record}" with "${cnameTarget}"`);
-          if (record === cnameTarget || record.endsWith(cnameTarget)) {
-            console.log(`[Background Verification] ✓ Match found: "${record}" matches "${cnameTarget}"`);
-            verified = true;
-            break;
-          }
-        }
-      } else {
-        console.log(`[Background Verification] No CNAME records found for ${domain}`);
-      }
+      // Simply use the result from the verifier service
+      const verified = verificationResult.verified;
       
       if (verified) {
         console.log(`[Background Verification] Domain ${domain} verified successfully!`);
