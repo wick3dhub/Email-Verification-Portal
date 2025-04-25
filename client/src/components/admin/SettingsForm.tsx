@@ -311,7 +311,7 @@ export default function SettingsForm() {
         // Domain settings
         useCustomDomain: settings.useCustomDomain,
         customDomain: settings.customDomain || '',
-        domainCnameTarget: settings.domainCnameTarget || '',
+        domainVerificationToken: settings.domainVerificationToken || '',
         domainVerified: settings.domainVerified,
         additionalDomains: settings.additionalDomains,
         // Email template settings
@@ -635,11 +635,11 @@ export default function SettingsForm() {
                   )}
                 />
                 
-                {/* Only show CNAME Record field if a domain has been added and there's a CNAME target */}
-                {form.watch('customDomain') && form.watch('domainCnameTarget') && (
+                {/* Only show TXT Record field if a domain has been added and there's a verification token */}
+                {form.watch('customDomain') && form.watch('domainVerificationToken') && (
                   <FormField
                     control={form.control}
-                    name="domainCnameTarget"
+                    name="domainVerificationToken"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>TXT Record Value</FormLabel>
@@ -708,7 +708,7 @@ export default function SettingsForm() {
                           if (data.settings) {
                             console.log("Updated settings received:", data.settings);
                             form.setValue('domainVerified', data.settings.domainVerified);
-                            form.setValue('domainCnameTarget', data.settings.domainCnameTarget);
+                            form.setValue('domainVerificationToken', data.settings.domainVerificationToken);
                             form.setValue('useCustomDomain', true);
                             // Keep the domain field unchanged - domain is stored in the database
                             // We will use this domain for domain verification checks
@@ -716,7 +716,7 @@ export default function SettingsForm() {
                           
                           toast({
                             title: "Domain added",
-                            description: `Add a TXT record to your DNS with value: wick3d-verification=${data.cnameTarget}`,
+                            description: `Add a TXT record to your DNS with value: wick3d-verification=${data.verificationToken}`,
                           });
                           
                           // Refresh settings data
@@ -725,7 +725,7 @@ export default function SettingsForm() {
                           // Show configuration instructions
                           setDnsInstructions({
                             domain: domain,
-                            verificationToken: data.cnameTarget,
+                            verificationToken: data.verificationToken,
                             showInstructions: true
                           });
                           
@@ -757,7 +757,7 @@ export default function SettingsForm() {
                       </>
                     ) : (
                       <>
-                        {form.watch('customDomain') && form.watch('domainCnameTarget') ? "Add Another Domain" : "Add Domain"}
+                        {form.watch('customDomain') && form.watch('domainVerificationToken') ? "Add Another Domain" : "Add Domain"}
                       </>
                     )}
                   </Button>
