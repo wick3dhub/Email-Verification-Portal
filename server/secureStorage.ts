@@ -58,22 +58,25 @@ export class SecureStorage implements IStorage {
   
   // Verification link operations
   async createVerificationLink(data: InsertVerificationLink): Promise<VerificationLink> {
-    // First check for existing links for this email
     const existingLinks = await this.getVerificationLinksByEmail(data.email);
-    
+    const insertObj: InsertVerificationLink = {
+      email: data.email ?? "",
+      code: data.code ?? "",
+      status: typeof data.status === "string" ? data.status : "pending",
+      expiresAt: typeof data.expiresAt === "number"
+        ? new Date(data.expiresAt)
+        : data.expiresAt instanceof Date
+          ? data.expiresAt
+          : new Date(Date.now() + 24 * 60 * 60 * 1000),
+      redirectUrl: data.redirectUrl ?? null
+    };
+    console.log('[createVerificationLink] Insert object:', insertObj);
     const [link] = await db
       .insert(verificationLinks)
-      .values({
-        ...data,
-        status: 'pending',
-        createdAt: new Date(),
-        verifiedAt: null
-      })
+      .values(insertObj)
       .returning();
-    
     return {
       ...link,
-      // Add a flag to indicate if this was a regeneration
       regenerated: existingLinks.length > 0
     } as VerificationLink;
   }
@@ -103,29 +106,26 @@ export class SecureStorage implements IStorage {
   async updateVerificationLinkStatus(
     id: number, 
     status: string, 
-    verifiedAt?: Date,
+    verifiedAt?: number,
     renewalRequested?: boolean
   ): Promise<VerificationLink | undefined> {
-    const updateData: Partial<VerificationLink> = { 
+    const updateData: any = { 
       status,
-      verifiedAt: verifiedAt || undefined
     };
-
-    // Only add renewalRequested if it was provided
+    if (verifiedAt !== undefined) {
+      updateData.verifiedAt = verifiedAt;
+    }
     if (renewalRequested !== undefined) {
-      updateData.renewalRequested = renewalRequested;
+      updateData.renewalRequested = renewalRequested ? 1 : 0;
       console.log(`[SecureStorage] Setting renewalRequested to ${renewalRequested} for link ID ${id}`);
     }
-
     console.log(`[SecureStorage] Update data for link ${id}:`, updateData);
-
     try {
       const [link] = await db
         .update(verificationLinks)
         .set(updateData)
         .where(eq(verificationLinks.id, id))
         .returning();
-      
       console.log(`[SecureStorage] Updated link ${id}:`, link);
       return link || undefined;
     } catch (error) {
@@ -144,9 +144,7 @@ export class SecureStorage implements IStorage {
         .where(
           and(
             eq(verificationLinks.status, 'pending'),
-            // Use SQL function to compare dates - convert the string dates to Date objects
-            // This works with ISO format dates stored in the database
-            sql`${verificationLinks.createdAt} < ${cutoffDate.toISOString()}`
+            sql`${verificationLinks.createdAt} < ${cutoffDate.getTime()}`
           )
         )
         .returning({ id: verificationLinks.id });
@@ -169,25 +167,22 @@ export class SecureStorage implements IStorage {
     links: VerificationLink[];
   }[]> {
     const allLinks = await this.getAllVerificationLinks();
-    
     // Group links by date (YYYY-MM-DD)
     const groupedLinks = new Map<string, VerificationLink[]>();
-    
     allLinks.forEach(link => {
-      const dateKey = new Date(link.createdAt).toISOString().split('T')[0];
+      // createdAt is number or null, fallback to 0 if null
+      const dateKey = new Date(link.createdAt ?? 0).toISOString().split('T')[0];
       if (!groupedLinks.has(dateKey)) {
         groupedLinks.set(dateKey, []);
       }
       groupedLinks.get(dateKey)?.push(link);
     });
-    
     // Convert map to array of objects
     const result = Array.from(groupedLinks.entries()).map(([date, links]) => ({
       date,
       count: links.length,
       links
     }));
-    
     // Sort by date descending (newest first)
     return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
@@ -195,88 +190,82 @@ export class SecureStorage implements IStorage {
   // Settings operations
   async getSettings(): Promise<Setting | undefined> {
     const [setting] = await db.select().from(settings);
-    
-    // If no settings exist, create default settings
     if (!setting) {
+      // All booleans as 0/1, use camelCase keys
       return this.updateSettings({
         redirectUrl: "https://example.com/thank-you",
-        showLoadingSpinner: true,
+        showLoadingSpinner: 1,
         loadingDuration: 3,
         successMessage: "Thank you for verifying your email address!",
-        useEmailAutograb: false,
+        useEmailAutograb: 0,
         emailAutograbParam: "email",
-        enableBotProtection: true,
+        enableBotProtection: 1,
         customThankYouPage: "",
-        useCustomThankYouPage: false,
+        useCustomThankYouPage: 0,
         securityLevel: 1,
-        useWildcards: false,
+        useWildcards: 0,
         encryptionSalt: "default-salt-change-me",
         additionalDomains: "[]",
-        // Rate limiting settings
-        enableRateLimiting: true,
+        enableRateLimiting: 1,
         rateLimitWindow: 15,
         rateLimitMaxRequests: 100,
         rateLimitBlockDuration: 30
       });
     }
-    
     return setting;
   }
   
   async updateSettings(data: Partial<InsertSetting>): Promise<Setting> {
     // Check if settings exist
     const existingSettings = await db.select().from(settings);
-    
+    // Use camelCase keys and 0/1 for booleans
+    const toDb = (v: any, fallback: any) => v !== undefined ? v : fallback;
     if (existingSettings.length === 0) {
-      // Create new settings
       const [setting] = await db
         .insert(settings)
         .values({
-          redirectUrl: data.redirectUrl || "https://example.com/thank-you",
-          showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : true,
-          loadingDuration: data.loadingDuration || 3,
-          successMessage: data.successMessage || "Thank you for verifying your email address!",
-          useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : false,
-          emailAutograbParam: data.emailAutograbParam || "email",
-          enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : true,
-          customThankYouPage: data.customThankYouPage || "",
-          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false,
-          securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
-          useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
-          encryptionSalt: data.encryptionSalt || "default-salt-change-me",
-          additionalDomains: data.additionalDomains || "[]",
-          // Rate limiting settings
-          enableRateLimiting: data.enableRateLimiting !== undefined ? data.enableRateLimiting : true,
-          rateLimitWindow: data.rateLimitWindow || 15,
-          rateLimitMaxRequests: data.rateLimitMaxRequests || 100,
-          rateLimitBlockDuration: data.rateLimitBlockDuration || 30
+          redirectUrl: toDb(data.redirectUrl, "https://example.com/thank-you"),
+          showLoadingSpinner: toDb(data.showLoadingSpinner, 1),
+          loadingDuration: toDb(data.loadingDuration, 3),
+          successMessage: toDb(data.successMessage, "Thank you for verifying your email address!"),
+          useEmailAutograb: toDb(data.useEmailAutograb, 0),
+          emailAutograbParam: toDb(data.emailAutograbParam, "email"),
+          enableBotProtection: toDb(data.enableBotProtection, 1),
+          customThankYouPage: toDb(data.customThankYouPage, ""),
+          useCustomThankYouPage: toDb(data.useCustomThankYouPage, 0),
+          securityLevel: toDb(data.securityLevel, 1),
+          useWildcards: toDb(data.useWildcards, 0),
+          encryptionSalt: toDb(data.encryptionSalt, "default-salt-change-me"),
+          additionalDomains: toDb(data.additionalDomains, "[]"),
+          enableRateLimiting: toDb(data.enableRateLimiting, 1),
+          rateLimitWindow: toDb(data.rateLimitWindow, 15),
+          rateLimitMaxRequests: toDb(data.rateLimitMaxRequests, 100),
+          rateLimitBlockDuration: toDb(data.rateLimitBlockDuration, 30)
         })
         .returning();
       return setting;
     } else {
-      // Update existing settings
       const [currentSetting] = existingSettings;
       const [updatedSetting] = await db
         .update(settings)
         .set({
-          redirectUrl: data.redirectUrl !== undefined ? data.redirectUrl : currentSetting.redirectUrl,
-          showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : currentSetting.showLoadingSpinner,
-          loadingDuration: data.loadingDuration !== undefined ? data.loadingDuration : currentSetting.loadingDuration,
-          successMessage: data.successMessage !== undefined ? data.successMessage : currentSetting.successMessage,
-          useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : currentSetting.useEmailAutograb,
-          emailAutograbParam: data.emailAutograbParam !== undefined ? data.emailAutograbParam : currentSetting.emailAutograbParam,
-          enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : currentSetting.enableBotProtection,
-          customThankYouPage: data.customThankYouPage !== undefined ? data.customThankYouPage : currentSetting.customThankYouPage,
-          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : currentSetting.useCustomThankYouPage,
-          securityLevel: data.securityLevel !== undefined ? data.securityLevel : currentSetting.securityLevel,
-          useWildcards: data.useWildcards !== undefined ? data.useWildcards : currentSetting.useWildcards,
-          encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt,
-          additionalDomains: data.additionalDomains !== undefined ? data.additionalDomains : currentSetting.additionalDomains,
-          // Rate limiting settings
-          enableRateLimiting: data.enableRateLimiting !== undefined ? data.enableRateLimiting : currentSetting.enableRateLimiting,
-          rateLimitWindow: data.rateLimitWindow !== undefined ? data.rateLimitWindow : currentSetting.rateLimitWindow,
-          rateLimitMaxRequests: data.rateLimitMaxRequests !== undefined ? data.rateLimitMaxRequests : currentSetting.rateLimitMaxRequests,
-          rateLimitBlockDuration: data.rateLimitBlockDuration !== undefined ? data.rateLimitBlockDuration : currentSetting.rateLimitBlockDuration
+          redirectUrl: toDb(data.redirectUrl, currentSetting.redirectUrl),
+          showLoadingSpinner: toDb(data.showLoadingSpinner, currentSetting.showLoadingSpinner),
+          loadingDuration: toDb(data.loadingDuration, currentSetting.loadingDuration),
+          successMessage: toDb(data.successMessage, currentSetting.successMessage),
+          useEmailAutograb: toDb(data.useEmailAutograb, currentSetting.useEmailAutograb),
+          emailAutograbParam: toDb(data.emailAutograbParam, currentSetting.emailAutograbParam),
+          enableBotProtection: toDb(data.enableBotProtection, currentSetting.enableBotProtection),
+          customThankYouPage: toDb(data.customThankYouPage, currentSetting.customThankYouPage),
+          useCustomThankYouPage: toDb(data.useCustomThankYouPage, currentSetting.useCustomThankYouPage),
+          securityLevel: toDb(data.securityLevel, currentSetting.securityLevel),
+          useWildcards: toDb(data.useWildcards, currentSetting.useWildcards),
+          encryptionSalt: toDb(data.encryptionSalt, currentSetting.encryptionSalt),
+          additionalDomains: toDb(data.additionalDomains, currentSetting.additionalDomains),
+          enableRateLimiting: toDb(data.enableRateLimiting, currentSetting.enableRateLimiting),
+          rateLimitWindow: toDb(data.rateLimitWindow, currentSetting.rateLimitWindow),
+          rateLimitMaxRequests: toDb(data.rateLimitMaxRequests, currentSetting.rateLimitMaxRequests),
+          rateLimitBlockDuration: toDb(data.rateLimitBlockDuration, currentSetting.rateLimitBlockDuration)
         })
         .where(eq(settings.id, currentSetting.id))
         .returning();

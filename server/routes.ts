@@ -455,7 +455,7 @@ async function getVerificationDomain(req: Request, domainOption: string = 'defau
 
 import { handleDomainCheck } from "./routes/domainCheck";
 
-export async function registerRoutes(app: Express, requireAuth?: (req: Request, res: Response, next: NextFunction) => Promise<void>): Promise<Server> {
+export async function registerRoutes(app: Express, requireAuth?: (req: Request, res: Response, next: NextFunction) => void): Promise<Server> {
   // Initialize domain tracker with existing domains from database
   try {
     const settings = await storage.getSettings();
@@ -537,14 +537,13 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
   // Authentication routes
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({ message: "Username and password are required" });
-    }
-    
     const user = await storage.getUserByUsername(username);
-    
-    if (!user || user.password !== password) {
+    // Hash the input password before comparing
+    const { createHash } = await import("crypto");
+    const hashedInput = createHash('sha256').update(password).digest('hex');
+    // Debug log
+    console.log('LOGIN DEBUG:', { username, password, hashedInput, user });
+    if (!user || user.password !== hashedInput) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
     
@@ -558,68 +557,46 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
   app.post("/api/auth/update-credentials", requireAuth ? requireAuth : (req, res, next) => next(), async (req: Request, res: Response) => {
     try {
       const { currentUsername, currentPassword, newUsername, newPassword } = req.body;
-      
       if (!currentUsername || !currentPassword || !newUsername || !newPassword) {
         return res.status(400).json({ 
           success: false,
           message: "All fields are required: currentUsername, currentPassword, newUsername, newPassword" 
         });
       }
-      
-      console.log(`Attempting to update credentials from ${currentUsername} to ${newUsername}`);
-      
       // First verify the current credentials
       const user = await storage.getUserByUsername(currentUsername);
-      
-      if (!user || user.password !== currentPassword) {
-        console.log("Invalid current credentials provided");
+      const { createHash } = await import("crypto");
+      const hashedCurrent = createHash('sha256').update(currentPassword).digest('hex');
+      if (!user || user.password !== hashedCurrent) {
         return res.status(401).json({ 
           success: false,
           message: "Current credentials are invalid" 
         });
       }
-      
       // Check if new username already exists (and it's not the current user)
       if (newUsername !== currentUsername) {
         const existingUser = await storage.getUserByUsername(newUsername);
         if (existingUser) {
-          console.log(`Username ${newUsername} already exists`);
           return res.status(400).json({ 
             success: false,
             message: "This username is already taken" 
           });
         }
       }
-      
+      // Hash the new password before saving
+      const hashedNew = createHash('sha256').update(newPassword).digest('hex');
       // Update the user credentials
-      // We'll use the existing user ID to update the record
-      const updatedUser = {
-        ...user,
-        username: newUsername,
-        password: newPassword
-      };
-      
-      // We need to implement an update method if not available
-      // For now we'll delete and recreate the user with the same ID
       if ('updateUser' in storage) {
         await (storage as any).updateUser(user.id, {
           username: newUsername,
-          password: newPassword
+          password: hashedNew
         });
       } else {
-        // Create a new user with the new credentials
-        // Note: This is a workaround and should be replaced with a proper updateUser method
         await storage.createUser({
           username: newUsername,
-          password: newPassword
+          password: hashedNew
         });
-        
-        // If we had multiple users, we would need to handle this differently
-        // But since we only have one admin user, this should work
       }
-      
-      console.log(`Credentials updated successfully for user ID ${user.id}`);
-      
       return res.status(200).json({ 
         success: true, 
         message: "Credentials updated successfully",
@@ -2032,6 +2009,26 @@ export async function registerRoutes(app: Express, requireAuth?: (req: Request, 
         success: false,
         error: "Error retrieving domain tracker data"
       });
+    }
+  });
+
+  // Debug endpoint to list all users and their password hashes
+  app.get("/api/debug/users", async (req: Request, res: Response) => {
+    try {
+      const storageAny = storage as any;
+      if (!('getAllUsers' in storageAny)) {
+        // Fallback: scan IDs 1-10
+        const users = [];
+        for (let i = 1; i <= 10; i++) {
+          const user = await storageAny.getUser(i);
+          if (user) users.push(user);
+        }
+        return res.status(200).json(users);
+      }
+      const users = await storageAny.getAllUsers();
+      return res.status(200).json(users);
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to fetch users' });
     }
   });
 

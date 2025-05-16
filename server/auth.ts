@@ -2,8 +2,6 @@ import type { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { storage } from "./storage";
 import { createHash, randomBytes } from "crypto";
-import { Pool } from "@neondatabase/serverless";
-import connectPgSimple from "connect-pg-simple";
 import { db } from "./db";
 
 declare module "express-session" {
@@ -13,28 +11,20 @@ declare module "express-session" {
   }
 }
 
-export async function setupAuth(app: Express, pool: Pool) {
-  // Initialize session store with PostgreSQL
-  const PgSession = connectPgSimple(session);
-  
-  // Generate a secure session secret or use from environment
+export async function setupAuth(app: Express) {
+  // Use default MemoryStore for sessions (for SQLite, consider connect-sqlite3 for production)
+  // const PgSession = connectPgSimple(session);
   const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
   
   // Set up session middleware with specific configuration for Replit environment
   app.use(
     session({
-      store: new PgSession({
-        pool,
-        tableName: "session",
-        createTableIfMissing: true,
-        pruneSessionInterval: 60,
-        errorLog: console.error // Add error logging for session store issues
-      }),
+      // store: new PgSession({ pool, ... }), // Remove Postgres session store
       name: 'wick3d_portal_sid',
       secret: sessionSecret,
       resave: true, 
       rolling: true,
-      saveUninitialized: true, // Set to true for compatibility
+      saveUninitialized: true,
       cookie: {
         secure: false,
         httpOnly: true,

@@ -26,7 +26,7 @@ export interface IStorage {
   getVerificationLinkByCode(code: string): Promise<VerificationLink | undefined>;
   getVerificationLinksByEmail(email: string): Promise<VerificationLink[]>;
   getAllVerificationLinks(): Promise<VerificationLink[]>;
-  updateVerificationLinkStatus(id: number, status: string, verifiedAt?: Date, renewalRequested?: boolean): Promise<VerificationLink | undefined>;
+  updateVerificationLinkStatus(id: number, status: string, verifiedAt?: number, renewalRequested?: boolean): Promise<VerificationLink | undefined>;
   
   // Settings operations
   getSettings(): Promise<Setting | undefined>;
@@ -61,24 +61,25 @@ export class MemStorage implements IStorage {
     this.settingsData = {
       id: this.settingsCurrentId++,
       redirectUrl: "https://example.com/thank-you",
-      showLoadingSpinner: true,
+      showLoadingSpinner: 1,
       loadingDuration: 3,
       successMessage: "Thank you for verifying your email address!",
-      useEmailAutograb: false,
+      useEmailAutograb: 0,
       emailAutograbParam: "email",
-      enableBotProtection: true,
+      enableBotProtection: 1,
       customThankYouPage: "",
-      useCustomThankYouPage: false,
+      useCustomThankYouPage: 0,
       // Domain settings
-      useCustomDomain: false,
+      useCustomDomain: 0,
       customDomain: "",
       domainCnameTarget: "",
-      domainVerified: false,
+      domainVerificationToken: "",
+      domainVerified: 0,
       additionalDomains: "[]", // JSON array of additional domains
       securityLevel: 1,
-      useWildcards: false,
+      useWildcards: 0,
       encryptionSalt: "default-salt-change-me",
-      allowLinkRenewal: true,
+      allowLinkRenewal: 1,
       // Custom message settings
       emailSubject: "Please verify your email address",
       emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -89,7 +90,7 @@ export class MemStorage implements IStorage {
       senderEmail: "no-reply@wick3d-links.com",
       senderName: "Wick3d Link Portal",
       // SOCKS5 proxy settings
-      useSocks5Proxy: false,
+      useSocks5Proxy: 0,
       socks5Host: "",
       socks5Port: 1080,
       socks5Username: "",
@@ -98,11 +99,11 @@ export class MemStorage implements IStorage {
       // Saved email templates
       savedTemplates: "[]", // JSON array of saved templates
       // Telegram notification settings
-      useTelegramNotifications: false,
+      useTelegramNotifications: 0,
       telegramBotToken: "",
       telegramChatId: "",
       // Rate limiting settings
-      enableRateLimiting: true,
+      enableRateLimiting: 1,
       rateLimitWindow: 15,
       rateLimitMaxRequests: 100,
       rateLimitBlockDuration: 30
@@ -148,10 +149,10 @@ export class MemStorage implements IStorage {
     const verificationLink: VerificationLink = {
       ...data,
       id,
-      status: 'pending',
-      createdAt: new Date(),
-      verifiedAt: null,
-      renewalRequested: false,
+      createdAt: Date.now(),
+      expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : (data.expiresAt instanceof Date ? data.expiresAt.getTime() : Date.now() + 24*60*60*1000),
+      verifiedAt: data.verifiedAt !== undefined ? (typeof data.verifiedAt === 'number' ? data.verifiedAt : (data.verifiedAt instanceof Date ? data.verifiedAt.getTime() : null)) : null,
+      renewalRequested: 0,
       redirectUrl: data.redirectUrl || null
     };
     this.verificationLinks.set(id, verificationLink);
@@ -177,7 +178,7 @@ export class MemStorage implements IStorage {
   async updateVerificationLinkStatus(
     id: number, 
     status: string, 
-    verifiedAt: Date | undefined = undefined,
+    verifiedAt: number | undefined = undefined,
     renewalRequested: boolean | undefined = undefined
   ): Promise<VerificationLink | undefined> {
     const verificationLink = this.verificationLinks.get(id);
@@ -185,8 +186,8 @@ export class MemStorage implements IStorage {
       const updatedLink: VerificationLink = {
         ...verificationLink,
         status,
-        verifiedAt: verifiedAt || verificationLink.verifiedAt,
-        renewalRequested: renewalRequested !== undefined ? renewalRequested : verificationLink.renewalRequested || false
+        verifiedAt: verifiedAt !== undefined ? (typeof verifiedAt === 'number' ? verifiedAt : (verifiedAt instanceof Date ? verifiedAt.getTime() : null)) : verificationLink.verifiedAt,
+        renewalRequested: renewalRequested !== undefined ? Number(renewalRequested) : Number(verificationLink.renewalRequested) || 0
       };
       this.verificationLinks.set(id, updatedLink);
       return updatedLink;
@@ -205,24 +206,25 @@ export class MemStorage implements IStorage {
       this.settingsData = {
         id: this.settingsCurrentId++,
         redirectUrl: data.redirectUrl || "",
-        showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : true,
+        showLoadingSpinner: data.showLoadingSpinner !== undefined ? Number(data.showLoadingSpinner) : 1,
         loadingDuration: data.loadingDuration || 3,
         successMessage: data.successMessage || "Thank you for verifying your email address!",
-        useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : false,
+        useEmailAutograb: data.useEmailAutograb !== undefined ? Number(data.useEmailAutograb) : 0,
         emailAutograbParam: data.emailAutograbParam || "email",
-        enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : true,
+        enableBotProtection: data.enableBotProtection !== undefined ? Number(data.enableBotProtection) : 1,
         customThankYouPage: data.customThankYouPage || "",
-        useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false,
+        useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? Number(data.useCustomThankYouPage) : 0,
         securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
-        useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
+        useWildcards: data.useWildcards !== undefined ? Number(data.useWildcards) : 0,
         encryptionSalt: data.encryptionSalt || "default-salt-change-me",
-        allowLinkRenewal: data.allowLinkRenewal !== undefined ? data.allowLinkRenewal : true,
+        allowLinkRenewal: data.allowLinkRenewal !== undefined ? Number(data.allowLinkRenewal) : 1,
         // Domain settings
-        useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : false,
+        useCustomDomain: data.useCustomDomain !== undefined ? Number(data.useCustomDomain) : 0,
         customDomain: data.customDomain || "",
         domainCnameTarget: data.domainCnameTarget || "",
-        domainVerified: data.domainVerified !== undefined ? data.domainVerified : false,
-        additionalDomains: data.additionalDomains || "[]",
+        domainVerificationToken: data.domainVerificationToken || "",
+        domainVerified: data.domainVerified !== undefined ? Number(data.domainVerified) : 0,
+        additionalDomains: typeof data.additionalDomains === 'string' ? data.additionalDomains : JSON.stringify(data.additionalDomains ?? []),
         // Custom email settings
         emailSubject: data.emailSubject || "Please verify your email address",
         emailTemplate: data.emailTemplate || "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
@@ -233,20 +235,20 @@ export class MemStorage implements IStorage {
         senderEmail: data.senderEmail || "no-reply@wick3d-links.com",
         senderName: data.senderName || "Wick3d Link Portal",
         // SOCKS5 proxy settings
-        useSocks5Proxy: data.useSocks5Proxy !== undefined ? data.useSocks5Proxy : false,
+        useSocks5Proxy: data.useSocks5Proxy !== undefined ? Number(data.useSocks5Proxy) : 0,
         socks5Host: data.socks5Host || "",
         socks5Port: data.socks5Port || 1080,
         socks5Username: data.socks5Username || "",
         socks5Password: data.socks5Password || "",
         socks5MaxAttempts: data.socks5MaxAttempts || 300,
         // Saved email templates
-        savedTemplates: data.savedTemplates || "[]",
+        savedTemplates: typeof data.savedTemplates === 'string' ? data.savedTemplates : JSON.stringify(data.savedTemplates ?? []),
         // Telegram notification settings
-        useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : false,
+        useTelegramNotifications: data.useTelegramNotifications !== undefined ? Number(data.useTelegramNotifications) : 0,
         telegramBotToken: data.telegramBotToken || "",
         telegramChatId: data.telegramChatId || "",
         // Rate limiting settings
-        enableRateLimiting: data.enableRateLimiting !== undefined ? data.enableRateLimiting : true,
+        enableRateLimiting: data.enableRateLimiting !== undefined ? Number(data.enableRateLimiting) : 1,
         rateLimitWindow: data.rateLimitWindow || 15,
         rateLimitMaxRequests: data.rateLimitMaxRequests || 100,
         rateLimitBlockDuration: data.rateLimitBlockDuration || 30
@@ -256,24 +258,25 @@ export class MemStorage implements IStorage {
       this.settingsData = {
         ...this.settingsData,
         redirectUrl: data.redirectUrl !== undefined ? data.redirectUrl : this.settingsData.redirectUrl,
-        showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : this.settingsData.showLoadingSpinner,
+        showLoadingSpinner: data.showLoadingSpinner !== undefined ? Number(data.showLoadingSpinner) : 1,
         loadingDuration: data.loadingDuration !== undefined ? data.loadingDuration : this.settingsData.loadingDuration,
         successMessage: data.successMessage !== undefined ? data.successMessage : this.settingsData.successMessage,
-        useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : this.settingsData.useEmailAutograb,
+        useEmailAutograb: data.useEmailAutograb !== undefined ? Number(data.useEmailAutograb) : 0,
         emailAutograbParam: data.emailAutograbParam !== undefined ? data.emailAutograbParam : this.settingsData.emailAutograbParam,
-        enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : this.settingsData.enableBotProtection,
+        enableBotProtection: data.enableBotProtection !== undefined ? Number(data.enableBotProtection) : 1,
         customThankYouPage: data.customThankYouPage !== undefined ? data.customThankYouPage : this.settingsData.customThankYouPage,
-        useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : this.settingsData.useCustomThankYouPage,
+        useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? Number(data.useCustomThankYouPage) : 0,
         securityLevel: data.securityLevel !== undefined ? data.securityLevel : this.settingsData.securityLevel,
-        useWildcards: data.useWildcards !== undefined ? data.useWildcards : this.settingsData.useWildcards,
+        useWildcards: data.useWildcards !== undefined ? Number(data.useWildcards) : 0,
         encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : this.settingsData.encryptionSalt,
-        allowLinkRenewal: data.allowLinkRenewal !== undefined ? data.allowLinkRenewal : this.settingsData.allowLinkRenewal,
+        allowLinkRenewal: data.allowLinkRenewal !== undefined ? Number(data.allowLinkRenewal) : 1,
         // Domain settings
-        useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : this.settingsData.useCustomDomain,
+        useCustomDomain: data.useCustomDomain !== undefined ? Number(data.useCustomDomain) : 0,
         customDomain: data.customDomain !== undefined ? data.customDomain : this.settingsData.customDomain,
         domainCnameTarget: data.domainCnameTarget !== undefined ? data.domainCnameTarget : this.settingsData.domainCnameTarget,
-        domainVerified: data.domainVerified !== undefined ? data.domainVerified : this.settingsData.domainVerified,
-        additionalDomains: data.additionalDomains !== undefined ? data.additionalDomains : this.settingsData.additionalDomains,
+        domainVerificationToken: data.domainVerificationToken !== undefined ? data.domainVerificationToken : this.settingsData.domainVerificationToken,
+        domainVerified: data.domainVerified !== undefined ? Number(data.domainVerified) : 0,
+        additionalDomains: typeof data.additionalDomains === 'string' ? data.additionalDomains : JSON.stringify(data.additionalDomains ?? []),
         // Email settings
         emailSubject: data.emailSubject !== undefined ? data.emailSubject : this.settingsData.emailSubject,
         emailTemplate: data.emailTemplate !== undefined ? data.emailTemplate : this.settingsData.emailTemplate,
@@ -284,20 +287,20 @@ export class MemStorage implements IStorage {
         senderEmail: data.senderEmail !== undefined ? data.senderEmail : this.settingsData.senderEmail,
         senderName: data.senderName !== undefined ? data.senderName : this.settingsData.senderName,
         // SOCKS5 proxy settings
-        useSocks5Proxy: data.useSocks5Proxy !== undefined ? data.useSocks5Proxy : this.settingsData.useSocks5Proxy,
+        useSocks5Proxy: data.useSocks5Proxy !== undefined ? Number(data.useSocks5Proxy) : 0,
         socks5Host: data.socks5Host !== undefined ? data.socks5Host : this.settingsData.socks5Host,
         socks5Port: data.socks5Port !== undefined ? data.socks5Port : this.settingsData.socks5Port,
         socks5Username: data.socks5Username !== undefined ? data.socks5Username : this.settingsData.socks5Username,
         socks5Password: data.socks5Password !== undefined ? data.socks5Password : this.settingsData.socks5Password,
         socks5MaxAttempts: data.socks5MaxAttempts !== undefined ? data.socks5MaxAttempts : this.settingsData.socks5MaxAttempts,
         // Saved email templates
-        savedTemplates: data.savedTemplates !== undefined ? data.savedTemplates : this.settingsData.savedTemplates,
+        savedTemplates: typeof data.savedTemplates === 'string' ? data.savedTemplates : JSON.stringify(data.savedTemplates ?? []),
         // Telegram notification settings
-        useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : this.settingsData.useTelegramNotifications,
+        useTelegramNotifications: data.useTelegramNotifications !== undefined ? Number(data.useTelegramNotifications) : 0,
         telegramBotToken: data.telegramBotToken !== undefined ? data.telegramBotToken : this.settingsData.telegramBotToken,
         telegramChatId: data.telegramChatId !== undefined ? data.telegramChatId : this.settingsData.telegramChatId,
         // Rate limiting settings
-        enableRateLimiting: data.enableRateLimiting !== undefined ? data.enableRateLimiting : this.settingsData.enableRateLimiting,
+        enableRateLimiting: data.enableRateLimiting !== undefined ? Number(data.enableRateLimiting) : 1,
         rateLimitWindow: data.rateLimitWindow !== undefined ? data.rateLimitWindow : this.settingsData.rateLimitWindow,
         rateLimitMaxRequests: data.rateLimitMaxRequests !== undefined ? data.rateLimitMaxRequests : this.settingsData.rateLimitMaxRequests,
         rateLimitBlockDuration: data.rateLimitBlockDuration !== undefined ? data.rateLimitBlockDuration : this.settingsData.rateLimitBlockDuration
@@ -364,10 +367,10 @@ export class DatabaseStorage implements IStorage {
       .insert(verificationLinks)
       .values({
         ...data,
-        status: 'pending',
-        createdAt: new Date(),
-        verifiedAt: null,
-        renewalRequested: false,
+        createdAt: Date.now(),
+        expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : (data.expiresAt instanceof Date ? data.expiresAt.getTime() : Date.now() + 24*60*60*1000),
+        verifiedAt: data.verifiedAt !== undefined ? (typeof data.verifiedAt === 'number' ? data.verifiedAt : (data.verifiedAt instanceof Date ? data.verifiedAt.getTime() : null)) : null,
+        renewalRequested: 0,
         redirectUrl: data.redirectUrl || null
       })
       .returning();
@@ -399,17 +402,20 @@ export class DatabaseStorage implements IStorage {
   async updateVerificationLinkStatus(
     id: number, 
     status: string, 
-    verifiedAt?: Date,
+    verifiedAt?: number,
     renewalRequested?: boolean
   ): Promise<VerificationLink | undefined> {
     const updateData: Partial<VerificationLink> = { 
       status,
-      verifiedAt: verifiedAt || undefined
     };
+
+    if (verifiedAt !== undefined) {
+      updateData.verifiedAt = typeof verifiedAt === 'number' ? verifiedAt : (verifiedAt instanceof Date ? verifiedAt.getTime() : null);
+    }
 
     // Only add renewalRequested if it was provided
     if (renewalRequested !== undefined) {
-      updateData.renewalRequested = renewalRequested;
+      updateData.renewalRequested = Number(renewalRequested);
       console.log(`Setting renewalRequested to ${renewalRequested} for link ID ${id}`);
     }
 
@@ -438,25 +444,24 @@ export class DatabaseStorage implements IStorage {
     if (!setting) {
       return this.updateSettings({
         redirectUrl: "https://example.com/thank-you",
-        showLoadingSpinner: true,
+        showLoadingSpinner: 1,
         loadingDuration: 3,
         successMessage: "Thank you for verifying your email address!",
-        useEmailAutograb: false,
+        useEmailAutograb: 0,
         emailAutograbParam: "email",
-        enableBotProtection: true,
+        enableBotProtection: 1,
         customThankYouPage: "",
-        useCustomThankYouPage: false,
+        useCustomThankYouPage: 0,
         securityLevel: 1,
-        useWildcards: false,
+        useWildcards: 0,
         encryptionSalt: "default-salt-change-me",
-        allowLinkRenewal: true,
-        // Domain settings
-        useCustomDomain: false,
+        allowLinkRenewal: 1,
+        useCustomDomain: 0,
         customDomain: "",
         domainCnameTarget: "",
-        domainVerified: false,
+        domainVerificationToken: "",
+        domainVerified: 0,
         additionalDomains: "[]",
-        // Custom message settings
         emailSubject: "Please verify your email address",
         emailTemplate: "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
         smtpServer: "localhost",
@@ -465,21 +470,17 @@ export class DatabaseStorage implements IStorage {
         smtpPassword: "",
         senderEmail: "no-reply@wick3d-links.com",
         senderName: "Wick3d Link Portal",
-        // SOCKS5 proxy settings
-        useSocks5Proxy: false,
+        useSocks5Proxy: 0,
         socks5Host: "",
         socks5Port: 1080,
         socks5Username: "",
         socks5Password: "",
         socks5MaxAttempts: 300,
-        // Saved email templates
         savedTemplates: "[]",
-        // Telegram notification settings
-        useTelegramNotifications: false,
+        useTelegramNotifications: 0,
         telegramBotToken: "",
         telegramChatId: "",
-        // Rate limiting settings
-        enableRateLimiting: true,
+        enableRateLimiting: 1,
         rateLimitWindow: 15,
         rateLimitMaxRequests: 100,
         rateLimitBlockDuration: 30
@@ -492,32 +493,35 @@ export class DatabaseStorage implements IStorage {
   async updateSettings(data: Partial<InsertSetting>): Promise<Setting> {
     // Check if settings exist
     const existingSettings = await db.select().from(settings);
-    
+    function boolToInt(val: boolean | number | undefined, def: number) {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'boolean') return val ? 1 : 0;
+      return def;
+    }
     if (existingSettings.length === 0) {
       // Create new settings
       const [setting] = await db
         .insert(settings)
         .values({
           redirectUrl: data.redirectUrl || "https://example.com/thank-you",
-          showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : true,
+          showLoadingSpinner: boolToInt(data.showLoadingSpinner, 1),
           loadingDuration: data.loadingDuration || 3,
           successMessage: data.successMessage || "Thank you for verifying your email address!",
-          useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : false,
+          useEmailAutograb: boolToInt(data.useEmailAutograb, 0),
           emailAutograbParam: data.emailAutograbParam || "email",
-          enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : true,
+          enableBotProtection: boolToInt(data.enableBotProtection, 1),
           customThankYouPage: data.customThankYouPage || "",
-          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : false,
+          useCustomThankYouPage: boolToInt(data.useCustomThankYouPage, 0),
           securityLevel: data.securityLevel !== undefined ? data.securityLevel : 1,
-          useWildcards: data.useWildcards !== undefined ? data.useWildcards : false,
+          useWildcards: boolToInt(data.useWildcards, 0),
           encryptionSalt: data.encryptionSalt || "default-salt-change-me",
-          allowLinkRenewal: data.allowLinkRenewal !== undefined ? data.allowLinkRenewal : true,
-          // Domain settings
-          useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : false,
+          allowLinkRenewal: boolToInt(data.allowLinkRenewal, 1),
+          useCustomDomain: boolToInt(data.useCustomDomain, 0),
           customDomain: data.customDomain || "",
           domainCnameTarget: data.domainCnameTarget || "",
-          domainVerified: data.domainVerified !== undefined ? data.domainVerified : false,
-          additionalDomains: data.additionalDomains || "[]",
-          // Custom message settings
+          domainVerificationToken: data.domainVerificationToken || "",
+          domainVerified: boolToInt(data.domainVerified, 0),
+          additionalDomains: typeof data.additionalDomains === 'string' ? data.additionalDomains : JSON.stringify(data.additionalDomains ?? []),
           emailSubject: data.emailSubject || "Please verify your email address",
           emailTemplate: data.emailTemplate || "Hello,\n\nPlease click the link below to verify your email address:\n\n{link}\n\nThis link will expire in 7 days.\n\nThank you,\nWick3d Link Portal",
           smtpServer: data.smtpServer || "localhost",
@@ -526,73 +530,73 @@ export class DatabaseStorage implements IStorage {
           smtpPassword: data.smtpPassword || "",
           senderEmail: data.senderEmail || "no-reply@wick3d-links.com",
           senderName: data.senderName || "Wick3d Link Portal",
-          // SOCKS5 proxy settings
-          useSocks5Proxy: data.useSocks5Proxy !== undefined ? data.useSocks5Proxy : false,
+          useSocks5Proxy: boolToInt(data.useSocks5Proxy, 0),
           socks5Host: data.socks5Host || "",
           socks5Port: data.socks5Port || 1080,
           socks5Username: data.socks5Username || "",
           socks5Password: data.socks5Password || "",
           socks5MaxAttempts: data.socks5MaxAttempts || 300,
-          // Saved email templates
-          savedTemplates: data.savedTemplates || "[]",
-          // Telegram notification settings
-          useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : false,
+          savedTemplates: typeof data.savedTemplates === 'string' ? data.savedTemplates : JSON.stringify(data.savedTemplates ?? []),
+          useTelegramNotifications: boolToInt(data.useTelegramNotifications, 0),
           telegramBotToken: data.telegramBotToken || "",
-          telegramChatId: data.telegramChatId || ""
+          telegramChatId: data.telegramChatId || "",
+          enableRateLimiting: boolToInt(data.enableRateLimiting, 1),
+          rateLimitWindow: data.rateLimitWindow || 15,
+          rateLimitMaxRequests: data.rateLimitMaxRequests || 100,
+          rateLimitBlockDuration: data.rateLimitBlockDuration || 30,
         })
         .returning();
       return setting;
     } else {
       // Update existing settings
-      const [currentSetting] = existingSettings;
-      const [updatedSetting] = await db
+      const [setting] = await db
         .update(settings)
         .set({
-          redirectUrl: data.redirectUrl !== undefined ? data.redirectUrl : currentSetting.redirectUrl,
-          showLoadingSpinner: data.showLoadingSpinner !== undefined ? data.showLoadingSpinner : currentSetting.showLoadingSpinner,
-          loadingDuration: data.loadingDuration !== undefined ? data.loadingDuration : currentSetting.loadingDuration,
-          successMessage: data.successMessage !== undefined ? data.successMessage : currentSetting.successMessage,
-          useEmailAutograb: data.useEmailAutograb !== undefined ? data.useEmailAutograb : currentSetting.useEmailAutograb,
-          emailAutograbParam: data.emailAutograbParam !== undefined ? data.emailAutograbParam : currentSetting.emailAutograbParam,
-          enableBotProtection: data.enableBotProtection !== undefined ? data.enableBotProtection : currentSetting.enableBotProtection,
-          customThankYouPage: data.customThankYouPage !== undefined ? data.customThankYouPage : currentSetting.customThankYouPage,
-          useCustomThankYouPage: data.useCustomThankYouPage !== undefined ? data.useCustomThankYouPage : currentSetting.useCustomThankYouPage,
-          securityLevel: data.securityLevel !== undefined ? data.securityLevel : currentSetting.securityLevel,
-          useWildcards: data.useWildcards !== undefined ? data.useWildcards : currentSetting.useWildcards,
-          encryptionSalt: data.encryptionSalt !== undefined ? data.encryptionSalt : currentSetting.encryptionSalt,
-          allowLinkRenewal: data.allowLinkRenewal !== undefined ? data.allowLinkRenewal : currentSetting.allowLinkRenewal,
-          // Domain settings
-          useCustomDomain: data.useCustomDomain !== undefined ? data.useCustomDomain : currentSetting.useCustomDomain,
-          customDomain: data.customDomain !== undefined ? data.customDomain : currentSetting.customDomain,
-          domainCnameTarget: data.domainCnameTarget !== undefined ? data.domainCnameTarget : currentSetting.domainCnameTarget,
-          domainVerified: data.domainVerified !== undefined ? data.domainVerified : currentSetting.domainVerified,
-          additionalDomains: data.additionalDomains !== undefined ? data.additionalDomains : currentSetting.additionalDomains,
-          // Email settings
-          emailSubject: data.emailSubject !== undefined ? data.emailSubject : currentSetting.emailSubject,
-          emailTemplate: data.emailTemplate !== undefined ? data.emailTemplate : currentSetting.emailTemplate,
-          smtpServer: data.smtpServer !== undefined ? data.smtpServer : currentSetting.smtpServer,
-          smtpPort: data.smtpPort !== undefined ? data.smtpPort : currentSetting.smtpPort,
-          smtpUser: data.smtpUser !== undefined ? data.smtpUser : currentSetting.smtpUser,
-          smtpPassword: data.smtpPassword !== undefined ? data.smtpPassword : currentSetting.smtpPassword,
-          senderEmail: data.senderEmail !== undefined ? data.senderEmail : currentSetting.senderEmail,
-          senderName: data.senderName !== undefined ? data.senderName : currentSetting.senderName,
-          // SOCKS5 proxy settings
-          useSocks5Proxy: data.useSocks5Proxy !== undefined ? data.useSocks5Proxy : currentSetting.useSocks5Proxy,
-          socks5Host: data.socks5Host !== undefined ? data.socks5Host : currentSetting.socks5Host,
-          socks5Port: data.socks5Port !== undefined ? data.socks5Port : currentSetting.socks5Port,
-          socks5Username: data.socks5Username !== undefined ? data.socks5Username : currentSetting.socks5Username,
-          socks5Password: data.socks5Password !== undefined ? data.socks5Password : currentSetting.socks5Password,
-          socks5MaxAttempts: data.socks5MaxAttempts !== undefined ? data.socks5MaxAttempts : currentSetting.socks5MaxAttempts,
-          // Saved email templates
-          savedTemplates: data.savedTemplates !== undefined ? data.savedTemplates : currentSetting.savedTemplates,
-          // Telegram notification settings
-          useTelegramNotifications: data.useTelegramNotifications !== undefined ? data.useTelegramNotifications : currentSetting.useTelegramNotifications,
-          telegramBotToken: data.telegramBotToken !== undefined ? data.telegramBotToken : currentSetting.telegramBotToken,
-          telegramChatId: data.telegramChatId !== undefined ? data.telegramChatId : currentSetting.telegramChatId
+          ...(data.redirectUrl !== undefined && { redirectUrl: data.redirectUrl }),
+          ...(data.showLoadingSpinner !== undefined && { showLoadingSpinner: boolToInt(data.showLoadingSpinner, 1) }),
+          ...(data.loadingDuration !== undefined && { loadingDuration: data.loadingDuration }),
+          ...(data.successMessage !== undefined && { successMessage: data.successMessage }),
+          ...(data.useEmailAutograb !== undefined && { useEmailAutograb: boolToInt(data.useEmailAutograb, 0) }),
+          ...(data.emailAutograbParam !== undefined && { emailAutograbParam: data.emailAutograbParam }),
+          ...(data.enableBotProtection !== undefined && { enableBotProtection: boolToInt(data.enableBotProtection, 1) }),
+          ...(data.customThankYouPage !== undefined && { customThankYouPage: data.customThankYouPage }),
+          ...(data.useCustomThankYouPage !== undefined && { useCustomThankYouPage: boolToInt(data.useCustomThankYouPage, 0) }),
+          ...(data.securityLevel !== undefined && { securityLevel: data.securityLevel }),
+          ...(data.useWildcards !== undefined && { useWildcards: boolToInt(data.useWildcards, 0) }),
+          ...(data.encryptionSalt !== undefined && { encryptionSalt: data.encryptionSalt }),
+          ...(data.allowLinkRenewal !== undefined && { allowLinkRenewal: boolToInt(data.allowLinkRenewal, 1) }),
+          ...(data.useCustomDomain !== undefined && { useCustomDomain: boolToInt(data.useCustomDomain, 0) }),
+          ...(data.customDomain !== undefined && { customDomain: data.customDomain }),
+          ...(data.domainCnameTarget !== undefined && { domainCnameTarget: data.domainCnameTarget }),
+          ...(data.domainVerificationToken !== undefined && { domainVerificationToken: data.domainVerificationToken }),
+          ...(data.domainVerified !== undefined && { domainVerified: boolToInt(data.domainVerified, 0) }),
+          ...(data.additionalDomains !== undefined && { additionalDomains: typeof data.additionalDomains === 'string' ? data.additionalDomains : JSON.stringify(data.additionalDomains ?? []) }),
+          ...(data.emailSubject !== undefined && { emailSubject: data.emailSubject }),
+          ...(data.emailTemplate !== undefined && { emailTemplate: data.emailTemplate }),
+          ...(data.smtpServer !== undefined && { smtpServer: data.smtpServer }),
+          ...(data.smtpPort !== undefined && { smtpPort: data.smtpPort }),
+          ...(data.smtpUser !== undefined && { smtpUser: data.smtpUser }),
+          ...(data.smtpPassword !== undefined && { smtpPassword: data.smtpPassword }),
+          ...(data.senderEmail !== undefined && { senderEmail: data.senderEmail }),
+          ...(data.senderName !== undefined && { senderName: data.senderName }),
+          ...(data.useSocks5Proxy !== undefined && { useSocks5Proxy: boolToInt(data.useSocks5Proxy, 0) }),
+          ...(data.socks5Host !== undefined && { socks5Host: data.socks5Host }),
+          ...(data.socks5Port !== undefined && { socks5Port: data.socks5Port }),
+          ...(data.socks5Username !== undefined && { socks5Username: data.socks5Username }),
+          ...(data.socks5Password !== undefined && { socks5Password: data.socks5Password }),
+          ...(data.socks5MaxAttempts !== undefined && { socks5MaxAttempts: data.socks5MaxAttempts }),
+          ...(data.savedTemplates !== undefined && { savedTemplates: typeof data.savedTemplates === 'string' ? data.savedTemplates : JSON.stringify(data.savedTemplates ?? []) }),
+          ...(data.useTelegramNotifications !== undefined && { useTelegramNotifications: boolToInt(data.useTelegramNotifications, 0) }),
+          ...(data.telegramBotToken !== undefined && { telegramBotToken: data.telegramBotToken }),
+          ...(data.telegramChatId !== undefined && { telegramChatId: data.telegramChatId }),
+          ...(data.enableRateLimiting !== undefined && { enableRateLimiting: boolToInt(data.enableRateLimiting, 1) }),
+          ...(data.rateLimitWindow !== undefined && { rateLimitWindow: data.rateLimitWindow }),
+          ...(data.rateLimitMaxRequests !== undefined && { rateLimitMaxRequests: data.rateLimitMaxRequests }),
+          ...(data.rateLimitBlockDuration !== undefined && { rateLimitBlockDuration: data.rateLimitBlockDuration }),
         })
-        .where(eq(settings.id, currentSetting.id))
+        .where(eq(settings.id, existingSettings[0].id))
         .returning();
-      return updatedSetting;
+      return setting;
     }
   }
   

